@@ -247,6 +247,11 @@ Buka sheet **`calendar_view`** di Google Spreadsheet Anda. Tampilan ini didesain
 4. **Analisis Silang (*Cross-Check*):**
    * Karena baris tanggalnya sejajar lurus dari kiri ke kanan, Anda bisa melihat dalam sekejap pada baris hari yang sama (misal hari Selasa, 4 November):
      > *"Saham apa yang lolos Screener Momentum hari ini sekaligus masuk ke jajaran Top Movers / Top Value?"* (Contoh: jika `BBCA` muncul di kedua sisi).
+5. **Stabilo Hijau Emiten Berulang (Hot Stocks):**
+   * Saham yang konsisten muncul di beberapa tanggal berbeda dalam bulan yang sama (misal `MSJA` muncul tgl 11 dan 12) otomatis ditandai:
+     * Diberi **warna teks hijau tebal** dengan badge jumlah kemunculan: `MSJA (2x) 🟢`.
+     * Kotak sel tanggal otomatis diberi **stabilo background hijau lembut** (`#f0fdf4`) sehingga hari-hari bursa yang memiliki saham konsisten langsung terlihat mencolok.
+     * Di `movers_dashboard` & `screener_dashboard`, baris emiten yang muncul $\ge 2$ hari otomatis diberi **stabilo hijau** (`#dcfce7`).
 
 ---
 

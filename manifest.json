@@ -37,11 +37,5 @@
       ],
       "run_at": "document_idle"
     }
-  ],
-  "browser_specific_settings": {
-    "gecko": {
-      "id": "stockbit-screener-movers-saver@antigravity",
-      "strict_min_version": "109.0"
-    }
-  }
+  ]
 }

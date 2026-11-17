@@ -648,6 +648,14 @@ function renderMoversCalendarPart() {
     }
   }
 
+  // Hitung Frekuensi Kemunculan per Emiten di Bulan Ini (Untuk Deteksi Saham Berulang)
+  const emitenFreqMap = new Map();
+  for (const [dateYMD, emList] of dateFinalEmitenMap.entries()) {
+    for (const sym of emList) {
+      emitenFreqMap.set(sym, (emitenFreqMap.get(sym) || 0) + 1);
+    }
+  }
+
   // Hitung Hari Senin Pertama
   const firstDayOfMonth = new Date(year, month - 1, 1);
   let dayOfWeek = firstDayOfMonth.getDay();
@@ -659,6 +667,17 @@ function renderMoversCalendarPart() {
   } else {
     startMonday = new Date(year, month - 1, 1 - (dayOfWeek - 1));
   }
+
+  // Text Style untuk Emiten Berulang (Stabilo Hijau Tebal) & Normal
+  const boldGreenStyle = SpreadsheetApp.newTextStyle()
+    .setForegroundColor("#15803d") // Hijau stabilo pekat
+    .setBold(true)
+    .build();
+
+  const normalStyle = SpreadsheetApp.newTextStyle()
+    .setForegroundColor("#0f172a")
+    .setBold(false)
+    .build();
 
   // Tulis ke Grid 6 Minggu (Baris 8 s/d 19)
   for (let w = 0; w < 6; w++) {
@@ -685,9 +704,41 @@ function renderMoversCalendarPart() {
             .setHorizontalAlignment("center")
             .setBorder(true, true, false, true, false, false, "#cbd5e1", SpreadsheetApp.BorderStyle.SOLID);
 
-          contentCell.setValue(emitenList.join("\n"))
+          // Format Teks & Stabilo Hijau untuk Emiten yang Muncul Beberapa Kali
+          let hasRepeatEmiten = false;
+          const lines = [];
+          const lineHighlightFlags = [];
+
+          for (const sym of emitenList) {
+            const freq = emitenFreqMap.get(sym) || 1;
+            if (freq >= 2) {
+              lines.push(`${sym} (${freq}x) 🟢`);
+              lineHighlightFlags.push(true);
+              hasRepeatEmiten = true;
+            } else {
+              lines.push(sym);
+              lineHighlightFlags.push(false);
+            }
+          }
+
+          const fullText = lines.join("\n");
+          const richTextBuilder = SpreadsheetApp.newRichTextValue().setText(fullText);
+
+          let currentPos = 0;
+          for (let i = 0; i < lines.length; i++) {
+            const lineLen = lines[i].length;
+            const endPos = currentPos + lineLen;
+            if (lineHighlightFlags[i]) {
+              richTextBuilder.setTextStyle(currentPos, endPos, boldGreenStyle);
+            } else {
+              richTextBuilder.setTextStyle(currentPos, endPos, normalStyle);
+            }
+            currentPos = endPos + 1; // newline '\n'
+          }
+
+          contentCell.setRichTextValue(richTextBuilder.build())
             .setWrap(true).setVerticalAlignment("top").setHorizontalAlignment("center")
-            .setFontColor("#0f172a").setFontWeight("bold").setBackground("#ffffff")
+            .setBackground(hasRepeatEmiten ? "#f0fdf4" : "#ffffff") // Stabilo hijau lembut jika ada emiten berulang
             .setBorder(false, true, true, true, false, false, "#cbd5e1", SpreadsheetApp.BorderStyle.SOLID);
         } else {
           dateCell.setValue(cellDateYMD)
@@ -744,6 +795,14 @@ function renderScreenerCalendarPart() {
     if (rScreener) emitenMap.get(rEmiten).add(rScreener);
   }
 
+  // Hitung Frekuensi Kemunculan per Emiten di Bulan Ini (Untuk Deteksi Saham Berulang)
+  const emitenFreqMap = new Map();
+  for (const [dateYMD, emMap] of dateMap.entries()) {
+    for (const sym of emMap.keys()) {
+      emitenFreqMap.set(sym, (emitenFreqMap.get(sym) || 0) + 1);
+    }
+  }
+
   // Hitung Hari Senin Pertama
   const firstDayOfMonth = new Date(year, month - 1, 1);
   let dayOfWeek = firstDayOfMonth.getDay();
@@ -755,6 +814,17 @@ function renderScreenerCalendarPart() {
   } else {
     startMonday = new Date(year, month - 1, 1 - (dayOfWeek - 1));
   }
+
+  // Text Style untuk Emiten Berulang (Stabilo Hijau Tebal) & Normal
+  const boldGreenStyle = SpreadsheetApp.newTextStyle()
+    .setForegroundColor("#15803d")
+    .setBold(true)
+    .build();
+
+  const normalStyle = SpreadsheetApp.newTextStyle()
+    .setForegroundColor("#0f172a")
+    .setBold(false)
+    .build();
 
   const colsScreener = ["G", "H", "I", "J", "K"];
 
@@ -784,9 +854,41 @@ function renderScreenerCalendarPart() {
             .setHorizontalAlignment("center")
             .setBorder(true, true, false, true, false, false, "#cbd5e1", SpreadsheetApp.BorderStyle.SOLID);
 
-          contentCell.setValue(emitenList.join("\n"))
+          // Format Teks & Stabilo Hijau untuk Emiten yang Muncul Beberapa Kali
+          let hasRepeatEmiten = false;
+          const lines = [];
+          const lineHighlightFlags = [];
+
+          for (const sym of emitenList) {
+            const freq = emitenFreqMap.get(sym) || 1;
+            if (freq >= 2) {
+              lines.push(`${sym} (${freq}x) 🟢`);
+              lineHighlightFlags.push(true);
+              hasRepeatEmiten = true;
+            } else {
+              lines.push(sym);
+              lineHighlightFlags.push(false);
+            }
+          }
+
+          const fullText = lines.join("\n");
+          const richTextBuilder = SpreadsheetApp.newRichTextValue().setText(fullText);
+
+          let currentPos = 0;
+          for (let i = 0; i < lines.length; i++) {
+            const lineLen = lines[i].length;
+            const endPos = currentPos + lineLen;
+            if (lineHighlightFlags[i]) {
+              richTextBuilder.setTextStyle(currentPos, endPos, boldGreenStyle);
+            } else {
+              richTextBuilder.setTextStyle(currentPos, endPos, normalStyle);
+            }
+            currentPos = endPos + 1;
+          }
+
+          contentCell.setRichTextValue(richTextBuilder.build())
             .setWrap(true).setVerticalAlignment("top").setHorizontalAlignment("center")
-            .setFontColor("#0f172a").setFontWeight("bold").setBackground("#ffffff")
+            .setBackground(hasRepeatEmiten ? "#f0fdf4" : "#ffffff")
             .setBorder(false, true, true, true, false, false, "#cbd5e1", SpreadsheetApp.BorderStyle.SOLID);
         } else {
           dateCell.setValue(cellDateYMD)
@@ -903,9 +1005,18 @@ function renderMoversDashboard() {
   }
 
   if (resultRows.length > 0) {
-    wsDash.getRange(6, 1, resultRows.length, 5).setValues(resultRows)
-      .setHorizontalAlignment("center");
+    const range = wsDash.getRange(6, 1, resultRows.length, 5);
+    range.setValues(resultRows).setHorizontalAlignment("center");
     wsDash.getRange(6, 4, resultRows.length, 1).setHorizontalAlignment("left"); // Kolom daftar kategori rata kiri
+
+    // Berikan stabilo hijau lembut untuk emiten yang muncul >= 2 hari
+    const backgrounds = [];
+    for (let i = 0; i < resultRows.length; i++) {
+      const daysCount = resultRows[i][1];
+      const rowBg = daysCount >= 2 ? ["#dcfce7", "#dcfce7", "#dcfce7", "#f0fdf4", "#f0fdf4"] : ["#ffffff", "#ffffff", "#ffffff", "#ffffff", "#ffffff"];
+      backgrounds.push(rowBg);
+    }
+    range.setBackgrounds(backgrounds);
   }
 }
 
@@ -1007,10 +1118,19 @@ function renderScreenerDashboard() {
   }
 
   if (resultRows.length > 0) {
-    wsDash.getRange(6, 1, resultRows.length, 5).setValues(resultRows)
-      .setHorizontalAlignment("center");
+    const range = wsDash.getRange(6, 1, resultRows.length, 5);
+    range.setValues(resultRows).setHorizontalAlignment("center");
     wsDash.getRange(6, 2, resultRows.length, 1).setHorizontalAlignment("left");
     wsDash.getRange(6, 5, resultRows.length, 1).setHorizontalAlignment("left");
+
+    // Berikan stabilo hijau lembut untuk emiten yang muncul >= 2 hari
+    const backgrounds = [];
+    for (let i = 0; i < resultRows.length; i++) {
+      const daysCount = resultRows[i][2];
+      const rowBg = daysCount >= 2 ? ["#dcfce7", "#f0fdf4", "#dcfce7", "#f0fdf4", "#f0fdf4"] : ["#ffffff", "#ffffff", "#ffffff", "#ffffff", "#ffffff"];
+      backgrounds.push(rowBg);
+    }
+    range.setBackgrounds(backgrounds);
   }
 }
 
