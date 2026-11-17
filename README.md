@@ -32,7 +32,7 @@ Ekstensi browser terpadu untuk **Google Chrome**, **Microsoft Edge**, **Brave Br
    * Menggunakan *background service worker* yang aman dari proteksi *Content Security Policy (CSP)* Stockbit.
 2. **Satu Google Spreadsheet Terpadu (All-in-One):**
    * **Side-by-Side Calendar View:**
-     * **Sisi Kiri:** Kalender **Movers** dengan 5 checklist kategori untuk memantau irisan saham harian.
+     * **Sisi Kiri:** Kalender **Movers** dengan 7 checklist kategori (Top Gainer, Top Loser, Top Value, Top Volume, Top Frequency, Net Foreign Buy, Net Foreign Sell) untuk memantau irisan saham harian.
      * **Sisi Kanan:** Kalender **Screener** dengan filter dropdown kategori strategi.
      * **Center Filter:** Pemilihan **Tahun (E3)** dan **Bulan (H3)** berada di posisi tengah (*Center*), cukup ubah 1 kali untuk menyinkronkan kedua kalender sekaligus.
    * **Struktur Tab Rapi & Baku:**
@@ -224,7 +224,9 @@ Buka sheet **`calendar_view`** di Google Spreadsheet Anda. Tampilan ini didesain
 +--------------------------------------------+---+--------------------------------------------------+
 | ⚡ MOVERS CALENDAR & FILTER IRISAN         | | | 🎯 SCREENER CALENDAR                             |
 | [Top Gainer][Top Loser]... (A5:E5)         | | | Kategori Screener: (G5:H5)                       |
-| [   ✓   ]   [   ✓   ]  ... (A6:E6)         | | | [ SEMUA KATEGORI ▼ ] (G6:H6)                     |
+| [   ✓   ]   [       ]  ... (A6:E6)         | | | [ SEMUA KATEGORI ▼ ] (G6:H6)                     |
+| [Net Foreign Buy] [Net Foreign Sell] (A7:B7)| | | Info & Tips Screener                             |
+| [   ✓   ]         [       ]          (A8:B8)| | | 🟢 Emiten hijau = muncul ≥ 2 kali dalam bulan    |
 +--------------------------------------------+ | +--------------------------------------------------+
 | Senin   | Selasa  | Rabu    | Kamis  | Jumat| | | Senin   | Selasa  | Rabu    | Kamis  | Jumat     |
 | (Kol A) | (Kol B) | (Kol C) | (Kol D)|(Kol E)| | (Kol G) | (Kol H) | (Kol I) | (Kol J)| (Kol K)   |
@@ -237,16 +239,17 @@ Buka sheet **`calendar_view`** di Google Spreadsheet Anda. Tampilan ini didesain
 #### Cara Penggunaan Calendar View:
 1. **Pengaturan Tahun (`E3`) & Bulan (`H3`) di Posisi Center:**
    * Cukup ubah Tahun di `E3` atau Bulan di `H3`, maka **kedua sisi kalender (Movers dan Screener) langsung ter-update serentak** ke bulan dan tahun perdagangan tersebut.
-2. **Sisi Kiri (Movers):**
-   * Di baris 6 terdapat 5 checklist kategori: `Top Gainer`, `Top Loser`, `Top Value`, `Top Volume`, `Top Frequency`.
-   * Centang kategori yang ingin Anda amati.
-   * **Fitur Irisan Penuh (*Full Intersection*):** Jika Anda mencentang *Top Gainer* dan *Top Volume*, kalender hanya akan menampilkan saham yang berhasil masuk ke **kedua** kategori tersebut pada tanggal yang sama.
+2. **Sisi Kiri (Movers - 7 Checklist Kategori & Filter Irisan):**
+   * **Baris 5 & 6:** Checklist `Top Gainer`, `Top Loser`, `Top Value`, `Top Volume`, `Top Frequency`.
+   * **Baris 7 & 8:** Checklist `Net Foreign Buy` dan `Net Foreign Sell`.
+   * **Fitur Irisan Penuh (*Full Intersection*):** Jika Anda mencentang *Top Gainer* dan *Net Foreign Buy*, kalender hanya akan menampilkan saham yang berhasil masuk ke **kedua** kategori tersebut (saham yang naik dan diborong asing pada hari yang sama).
+   * Anda bebas mengombinasikan kategori manapun (*misal: Top Value + Net Foreign Buy*).
 3. **Sisi Kanan (Screener):**
    * Di sel `G6` terdapat dropdown kategori strategi (misal: `SEMUA KATEGORI`, `MOMENTUM`, `BREAKOUT`, `VALUE`, `SWING`).
    * Pilih kategori untuk menyaring emiten yang lolos pada hari tersebut.
 4. **Analisis Silang (*Cross-Check*):**
    * Karena baris tanggalnya sejajar lurus dari kiri ke kanan, Anda bisa melihat dalam sekejap pada baris hari yang sama (misal hari Selasa, 4 November):
-     > *"Saham apa yang lolos Screener Momentum hari ini sekaligus masuk ke jajaran Top Movers / Top Value?"* (Contoh: jika `BBCA` muncul di kedua sisi).
+     > *"Saham apa yang lolos Screener Momentum hari ini sekaligus masuk ke jajaran Top Movers / Net Foreign Buy?"* (Contoh: jika `BBCA` muncul di kedua sisi).
 5. **Stabilo Hijau Emiten Berulang (Hot Stocks):**
    * Saham yang konsisten muncul di beberapa tanggal berbeda dalam bulan yang sama (misal `MSJA` muncul tgl 11 dan 12) otomatis ditandai:
      * Diberi **warna teks hijau tebal** dengan badge jumlah kemunculan: `MSJA (2x) 🟢`.

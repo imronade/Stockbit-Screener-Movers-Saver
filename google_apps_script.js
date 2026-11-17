@@ -61,8 +61,10 @@ function onEdit(e) {
         renderScreenerCalendarPart();
         return;
       }
-      // Edit Checkbox Movers (Baris 6, Kolom A s/d E) -> Refresh Kalender Movers
-      if (row === 6 && col >= 1 && col <= 5) {
+      // Edit Checkbox Movers:
+      // Baris 6 (Kolom A s/d E: Top Gainer, Loser, Value, Volume, Freq)
+      // Baris 8 (Kolom A s/d B: Net Foreign Buy, Net Foreign Sell)
+      if ((row === 6 && col >= 1 && col <= 5) || (row === 8 && col >= 1 && col <= 2)) {
         renderMoversCalendarPart();
         return;
       }
@@ -505,7 +507,7 @@ function setupCalendarSheetStructure() {
     .setHorizontalAlignment("center").setVerticalAlignment("middle");
   wsCal.setRowHeight(4, 24);
 
-  // Baris 5: Kategori Movers (Kiri) & Kategori Screener (Kanan) Sejajar
+  // Baris 5: Kategori Movers Baris 1 (Kiri) & Kategori Screener (Kanan) Sejajar
   const moversCatsRow1 = ["Top Gainer", "Top Loser", "Top Value", "Top Volume", "Top Frequency"];
   wsCal.getRange("A5:E5").setValues([moversCatsRow1])
     .setFontWeight("bold").setFontSize(9).setBackground("#e2e8f0").setHorizontalAlignment("center");
@@ -522,9 +524,9 @@ function setupCalendarSheetStructure() {
     .setHorizontalAlignment("center").setVerticalAlignment("middle");
   wsCal.setRowHeight(5, 22);
 
-  // Baris 6: Checklist Movers (Kiri) & Dropdown SEMUA KATEGORI Screener (Kanan) Sejajar
+  // Baris 6: Checklist Movers Baris 1 (Kiri) & Dropdown SEMUA KATEGORI Screener (Kanan) Sejajar
   wsCal.getRange("A6:E6").insertCheckboxes()
-    .setValues([[true, true, true, true, true]])
+    .setValues([[true, false, false, false, false]])
     .setHorizontalAlignment("center").setBackground("#f8fafc");
   wsCal.getRange("F6").setBackground("#f8fafc");
 
@@ -540,28 +542,64 @@ function setupCalendarSheetStructure() {
     .setHorizontalAlignment("center").setVerticalAlignment("middle");
   wsCal.setRowHeight(6, 25);
 
-  // Baris 7: Header Hari (Senin - Jumat) untuk Sisi Kiri & Kanan
+  // Baris 7: Kategori Movers Baris 2 (Net Foreign Buy & Sell) & Info Screener
+  const moversCatsRow2 = ["Net Foreign Buy", "Net Foreign Sell"];
+  wsCal.getRange("A7:B7").setValues([moversCatsRow2])
+    .setFontWeight("bold").setFontSize(9).setBackground("#e2e8f0").setHorizontalAlignment("center");
+
+  wsCal.getRange("C7:E7").merge()
+    .setValue("💡 Filter Irisan: Emiten harus lolos SEMUA kategori dicentang")
+    .setFontStyle("italic").setFontSize(9).setFontColor("#475569").setBackground("#f1f5f9")
+    .setHorizontalAlignment("center").setVerticalAlignment("middle");
+
+  wsCal.getRange("F7").setBackground("#f8fafc");
+
+  wsCal.getRange("G7:K7").merge()
+    .setValue("💡 Kalender Screener menyajikan emiten berdasarkan strategi")
+    .setFontStyle("italic").setFontSize(9).setFontColor("#475569").setBackground("#f1f5f9")
+    .setHorizontalAlignment("center").setVerticalAlignment("middle");
+  wsCal.setRowHeight(7, 22);
+
+  // Baris 8: Checklist Movers Baris 2 (NFB & NFS) & Legend Emiten Berulang
+  wsCal.getRange("A8:B8").insertCheckboxes()
+    .setValues([[false, false]])
+    .setHorizontalAlignment("center").setBackground("#f8fafc");
+
+  wsCal.getRange("C8:E8").merge()
+    .setValue("* Centang NFB/NFS untuk melihat emiten dengan arus asing")
+    .setFontStyle("italic").setFontSize(9).setFontColor("#64748b").setBackground("#f8fafc")
+    .setHorizontalAlignment("center").setVerticalAlignment("middle");
+
+  wsCal.getRange("F8").setBackground("#f8fafc");
+
+  wsCal.getRange("G8:K8").merge()
+    .setValue("🟢 Emiten hijau = muncul ≥ 2 kali dalam bulan ini")
+    .setFontStyle("italic").setFontSize(9).setFontColor("#166534").setFontWeight("bold").setBackground("#f0fdf4")
+    .setHorizontalAlignment("center").setVerticalAlignment("middle");
+  wsCal.setRowHeight(8, 25);
+
+  // Baris 9: Header Hari (Senin - Jumat) untuk Sisi Kiri & Kanan
   const dayHeaders = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat"];
-  wsCal.getRange("A7:E7").setValues([dayHeaders])
+  wsCal.getRange("A9:E9").setValues([dayHeaders])
     .setFontWeight("bold").setBackground("#2563eb").setFontColor("#ffffff")
     .setHorizontalAlignment("center").setVerticalAlignment("middle");
 
-  wsCal.getRange("F7").setValue("").setBackground("#e2e8f0");
+  wsCal.getRange("F9").setValue("").setBackground("#e2e8f0");
 
-  wsCal.getRange("G7:K7").setValues([dayHeaders])
+  wsCal.getRange("G9:K9").setValues([dayHeaders])
     .setFontWeight("bold").setBackground("#00875A").setFontColor("#ffffff")
     .setHorizontalAlignment("center").setVerticalAlignment("middle");
 
-  wsCal.setRowHeight(7, 26);
+  wsCal.setRowHeight(9, 26);
 
   // Format Lebar Kolom
   for (let c = 1; c <= 5; c++) wsCal.setColumnWidth(c, 160); // A - E: Movers
   wsCal.setColumnWidth(6, 30);                                // F: Divider
   for (let c = 7; c <= 11; c++) wsCal.setColumnWidth(c, 160); // G - K: Screener
 
-  // Format Tinggi Baris Grid Kalender (6 Minggu x 2 Baris = 12 Baris, Baris 8 s/d 19)
+  // Format Tinggi Baris Grid Kalender (6 Minggu x 2 Baris = 12 Baris, Baris 10 s/d 21)
   for (let w = 0; w < 6; w++) {
-    const rDate = 8 + (w * 2);
+    const rDate = 10 + (w * 2);
     const rContent = rDate + 1;
     wsCal.setRowHeight(rDate, 22);
     wsCal.setRowHeight(rContent, 65);
@@ -590,13 +628,21 @@ function renderMoversCalendarPart() {
   const monthStr = String(wsCal.getRange("H3").getValue());
   const month = parseMonthIndex(monthStr);
 
-  // Kategori aktif dari Baris 5 & Baris 6 (Kolom A-E)
-  const catNames = wsCal.getRange("A5:E5").getValues()[0];
-  const catChecks = wsCal.getRange("A6:E6").getValues()[0];
+  // Kategori aktif dari Baris 5 & 6 (A-E) dan Baris 7 & 8 (A-B)
+  const catNamesRow1 = wsCal.getRange("A5:E5").getValues()[0];
+  const catChecksRow1 = wsCal.getRange("A6:E6").getValues()[0];
+  const catNamesRow2 = wsCal.getRange("A7:B7").getValues()[0];
+  const catChecksRow2 = wsCal.getRange("A8:B8").getValues()[0];
+
   const activeCategories = new Set();
-  for (let i = 0; i < catNames.length; i++) {
-    if (catNames[i] && catChecks[i] === true) {
-      activeCategories.add(String(catNames[i]).trim().toLowerCase());
+  for (let i = 0; i < catNamesRow1.length; i++) {
+    if (catNamesRow1[i] && catChecksRow1[i] === true) {
+      activeCategories.add(String(catNamesRow1[i]).trim().toLowerCase());
+    }
+  }
+  for (let i = 0; i < catNamesRow2.length; i++) {
+    if (catNamesRow2[i] && catChecksRow2[i] === true) {
+      activeCategories.add(String(catNamesRow2[i]).trim().toLowerCase());
     }
   }
 
@@ -605,9 +651,9 @@ function renderMoversCalendarPart() {
   // Jika tidak ada kategori yang dicentang, kosongkan grid Movers
   if (activeCategories.size === 0) {
     for (let w = 0; w < 6; w++) {
-      const rContent = 8 + (w * 2) + 1;
+      const rContent = 10 + (w * 2) + 1;
       for (let c = 0; c < 5; c++) {
-        wsCal.getRange(colsMovers[c] + rContent).setValue("");
+        wsCal.getRange(colsMovers[c] + rContent).setValue("").setBackground("#ffffff");
       }
     }
     return;
@@ -679,9 +725,9 @@ function renderMoversCalendarPart() {
     .setBold(false)
     .build();
 
-  // Tulis ke Grid 6 Minggu (Baris 8 s/d 19)
+  // Tulis ke Grid 6 Minggu (Baris 10 s/d 21)
   for (let w = 0; w < 6; w++) {
-    const rDate = 8 + (w * 2);
+    const rDate = 10 + (w * 2);
     const rContent = rDate + 1;
 
     for (let c = 0; c < 5; c++) {
@@ -828,8 +874,9 @@ function renderScreenerCalendarPart() {
 
   const colsScreener = ["G", "H", "I", "J", "K"];
 
+  // Tulis ke Grid 6 Minggu (Baris 10 s/d 21)
   for (let w = 0; w < 6; w++) {
-    const rDate = 8 + (w * 2);
+    const rDate = 10 + (w * 2);
     const rContent = rDate + 1;
 
     for (let c = 0; c < 5; c++) {
@@ -1197,7 +1244,7 @@ function setupGuideSheetStructure() {
     [""],
     ["2. CARA MENGGUNAKAN CALENDAR VIEW (SIDE-BY-SIDE):"],
     ["   a. Pengaturan Tahun (E3) & Bulan (H3) di posisi tengah atas berlaku untuk KEDUA kalender sekaligus."],
-    ["   b. SISI KIRI (Movers): Centang kategori Movers yang ingin Anda pantau. Hanya saham yang masuk irisan penuh yang akan muncul."],
+    ["   b. SISI KIRI (Movers): Centang kategori Movers yang ingin Anda pantau (Top Gainer, Top Loser, Top Value, Top Volume, Top Frequency, Net Foreign Buy, Net Foreign Sell). Hanya saham yang masuk irisan penuh dari seluruh kategori yang dicentang yang akan muncul."],
     ["   c. SISI KANAN (Screener): Pilih kategori screener yang ingin Anda pantau pada dropdown G6."],
     ["   d. Anda dapat melihat secara instan per baris hari: saham apa yang masuk Top Movers sekaligus lolos Screener hari itu!"],
     [""],
