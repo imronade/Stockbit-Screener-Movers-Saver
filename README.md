@@ -296,7 +296,9 @@ Di toolbar atas Google Spreadsheet, Anda memiliki menu khusus:
 * **`✨ Setup Awal / Reset`:**
   * Membangun ulang seluruh template, layout kanan-kiri, tabel per kategori screener, styling border, warna tema, validasi dropdown, dan merapikan urutan tab sheet dari awal tanpa menghapus histori records.
 * **`🔄 Update Script`:**
-  * Mengambil source code script terbaru langsung dari GitHub resmi secara live, menyediakan 1 tombol untuk langsung menyalin seluruh kode ke clipboard beserta panduan deploy 2 langkah.
+  * Memeriksa versi script saat ini dengan repository GitHub resmi secara live:
+    * Jika sudah sama, menampilkan status **`✅ Script Up to Date`** sehingga Anda tidak perlu repot update.
+    * Jika ada versi baru, menampilkan badge **`⚡ Update Tersedia`**, ringkasan versi baru, dan 1 tombol **"📋 Salin Kode Terbaru"** ke clipboard beserta panduan deploy 2 langkah.
 * **`🔄 Refresh Tampilan`:**
   * **1-Klik untuk Semua:** Otomatis memperbarui data Kalender Movers, Kalender Screener, Movers Dashboard, Screener Dashboard, dan memastikan urutan sheet tetap rapi.
 
