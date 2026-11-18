@@ -325,3 +325,7 @@ Di toolbar atas Google Spreadsheet, Anda memiliki menu khusus:
 
 ### 4. Library Excel belum selesai dimuat saat klik Download (.xlsx)
 * Tunggu sekitar 2-3 detik setelah halaman Stockbit terbuka sempurna sebelum menekan tombol download agar file `xlsx.full.min.js` selesai diinisialisasi oleh browser.
+
+### 5. Tampilan kalender tampak tertimpa atau balik ke versi lama setelah Sync
+* **Penyebab:** Web App URL masih mengeksekusi versi snapshot deployment lama di server Google karena setelah script diperbarui, deployment belum di-update ke *New version*.
+* **Solusi:** Di Google Apps Script, klik **Deploy** > **Manage deployments** > Edit (ikon pensil) > pada dropdown *Version* pilih **New version** (Versi baru) > klik **Deploy**. Setelah itu, buka spreadsheet dan klik **🚀 Stockbit Tools** > **✨ Setup Awal / Reset**. Layout akan terkunci rapi dengan 7 kategori.
