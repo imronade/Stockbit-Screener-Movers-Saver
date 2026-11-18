@@ -32,6 +32,8 @@
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
   ui.createMenu("🚀 Stockbit Tools")
+    .addItem("🔄 Update Script", "showUpdateScriptModal")
+    .addSeparator()
     .addItem("✨ Setup Awal / Reset", "setupTemplateViews")
     .addSeparator()
     .addItem("🔄 Refresh Tampilan", "updateAllViews")
@@ -1141,7 +1143,7 @@ function renderMoversDashboard() {
 }
 
 // =========================================================================
-// 4. STRUKTUR & RENDER: SCREENER DASHBOARD
+// 4. STRUKTUR & RENDER: SCREENER DASHBOARD (PER TABEL KATEGORI)
 // =========================================================================
 function setupScreenerDashboardStructure() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -1150,7 +1152,7 @@ function setupScreenerDashboardStructure() {
   wsDash.clear();
   wsDash.setFrozenRows(0);
 
-  wsDash.getRange("A1").setValue("📊 DASHBOARD REKAP & IRISAN SCREENER")
+  wsDash.getRange("A1").setValue("📊 DASHBOARD REKAP & IRISAN SCREENER (PER KATEGORI)")
     .setFontSize(14).setFontWeight("bold").setFontColor("#00875A");
 
   wsDash.getRange("B3").setValue("Dari Tanggal:").setFontWeight("bold").setHorizontalAlignment("right");
@@ -1161,23 +1163,17 @@ function setupScreenerDashboardStructure() {
   wsDash.getRange("E3").setValue("2026-12-31").setHorizontalAlignment("center").setFontWeight("bold")
     .setBackground("#fffbeb").setBorder(true, true, true, true, false, false, "#000000", SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
 
-  const dashHeaders = [["Emiten", "Kategori Strategi", "Total Muncul (Hari)", "Frekuensi Screener", "Daftar Screener Terkait"]];
-  wsDash.getRange("A5:E5").setValues(dashHeaders)
-    .setFontWeight("bold").setBackground("#00875A").setFontColor("#ffffff")
-    .setHorizontalAlignment("center").setVerticalAlignment("middle");
-  wsDash.setRowHeight(5, 26);
-
-  wsDash.setColumnWidth(1, 100);
-  wsDash.setColumnWidth(2, 170);
-  wsDash.setColumnWidth(3, 160);
-  wsDash.setColumnWidth(4, 160);
-  wsDash.setColumnWidth(5, 300);
+  wsDash.setColumnWidth(1, 110); // Emiten
+  wsDash.setColumnWidth(2, 160); // Total Muncul (Hari)
+  wsDash.setColumnWidth(3, 170); // Frekuensi Screener
+  wsDash.setColumnWidth(4, 380); // Daftar Screener Terkait
 }
 
 function renderScreenerDashboard() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const wsDash = getSheetCaseInsensitive(ss, "screener_dashboard");
   const wsRecord = getSheetCaseInsensitive(ss, "screener_records");
+  const wsKat = getSheetCaseInsensitive(ss, "setting_kategori");
   if (!wsDash || !wsRecord) return;
 
   // Jika tanggal dikosongkan/dihapus, otomatis memilih seluruh data tanpa batas
@@ -1189,7 +1185,20 @@ function renderScreenerDashboard() {
   const lastRowRec = wsRecord.getLastRow();
   const data = lastRowRec > 1 ? wsRecord.getRange(2, 1, lastRowRec - 1, 7).getValues() : [];
 
-  const emitenMap = new Map();
+  // 1. Kumpulkan daftar urutan kategori dari setting_kategori agar teratur
+  const categoryOrder = [];
+  if (wsKat && wsKat.getLastRow() > 1) {
+    const kData = wsKat.getRange(2, 2, wsKat.getLastRow() - 1, 1).getValues();
+    kData.forEach(r => {
+      const k = String(r[0] || "").trim();
+      if (k && !categoryOrder.includes(k)) categoryOrder.push(k);
+    });
+  }
+
+  // 2. Kelompokkan data per Kategori -> Emiten
+  // Structure: categoryMap = Map<CategoryName, Map<Emiten, { dates: Set, screeners: Set }>>
+  const categoryMap = new Map();
+
   for (const row of data) {
     const rDate = parseDateToYMD(row[1]);
     if (!rDate) continue;
@@ -1197,60 +1206,137 @@ function renderScreenerDashboard() {
     if (endDateStr && rDate > endDateStr) continue;
 
     const rScreener = String(row[3] || "").trim();
-    const rCat = String(row[4] || "").trim();
+    const rCat = String(row[4] || "Lainnya").trim() || "Lainnya";
     const rEmiten = String(row[5] || "").trim();
 
     if (!rEmiten) continue;
 
-    if (!emitenMap.has(rEmiten)) {
-      emitenMap.set(rEmiten, {
+    if (!categoryMap.has(rCat)) {
+      categoryMap.set(rCat, new Map());
+    }
+    const catGroup = categoryMap.get(rCat);
+    if (!catGroup.has(rEmiten)) {
+      catGroup.set(rEmiten, {
         symbol: rEmiten,
-        categories: new Set(),
         dates: new Set(),
         screeners: new Set()
       });
     }
-    const item = emitenMap.get(rEmiten);
-    if (rCat) item.categories.add(rCat);
+    const item = catGroup.get(rEmiten);
     item.dates.add(rDate);
     if (rScreener) item.screeners.add(rScreener);
   }
 
-  const resultRows = [];
-  for (const [sym, d] of emitenMap.entries()) {
-    resultRows.push([
-      sym,
-      Array.from(d.categories).join(", ") || "Lainnya",
-      d.dates.size,
-      d.screeners.size,
-      Array.from(d.screeners).join(", ")
-    ]);
-  }
-
-  resultRows.sort((a, b) => {
-    if (b[3] !== a[3]) return b[3] - a[3]; // Total screener terbanyak
-    return b[2] - a[2];                   // Total hari terbanyak
-  });
-
+  // Bersihkan area tabel lama dari baris 5 ke bawah
+  const maxRows = wsDash.getMaxRows();
   const lastDashRow = wsDash.getLastRow();
-  if (lastDashRow >= 6) {
-    wsDash.getRange(6, 1, Math.max(lastDashRow - 5, 1), 5).clearContent().setBackground("#ffffff");
+  if (lastDashRow >= 5) {
+    wsDash.getRange(5, 1, Math.max(lastDashRow - 4, 1), 4).clear();
   }
 
-  if (resultRows.length > 0) {
-    const range = wsDash.getRange(6, 1, resultRows.length, 5);
-    range.setValues(resultRows).setHorizontalAlignment("center");
-    wsDash.getRange(6, 2, resultRows.length, 1).setHorizontalAlignment("left");
-    wsDash.getRange(6, 5, resultRows.length, 1).setHorizontalAlignment("left");
+  // Palet warna banner header per kategori agar estetik dan mudah dibedakan
+  const themeColors = [
+    { bg: "#00875A", text: "#FFFFFF" }, // Hijau Stockbit
+    { bg: "#1e40af", text: "#FFFFFF" }, // Biru
+    { bg: "#b45309", text: "#FFFFFF" }, // Amber/Cokelat
+    { bg: "#7e22ce", text: "#FFFFFF" }, // Ungu
+    { bg: "#0f766e", text: "#FFFFFF" }, // Teal
+    { bg: "#be123c", text: "#FFFFFF" }, // Rose
+    { bg: "#334155", text: "#FFFFFF" }  // Slate
+  ];
 
-    // Berikan stabilo hijau lembut untuk emiten yang muncul >= 2 hari
-    const backgrounds = [];
-    for (let i = 0; i < resultRows.length; i++) {
-      const daysCount = resultRows[i][2];
-      const rowBg = daysCount >= 2 ? ["#dcfce7", "#f0fdf4", "#dcfce7", "#f0fdf4", "#f0fdf4"] : ["#ffffff", "#ffffff", "#ffffff", "#ffffff", "#ffffff"];
-      backgrounds.push(rowBg);
+  // Susun daftar kategori yang akan dirender (kategori setting dulu, baru sisanya)
+  const allRenderCats = [...categoryOrder];
+  for (const cat of categoryMap.keys()) {
+    if (!allRenderCats.includes(cat)) {
+      allRenderCats.push(cat);
     }
-    range.setBackgrounds(backgrounds);
+  }
+
+  let currentRow = 5;
+  let colorIdx = 0;
+
+  for (const catName of allRenderCats) {
+    const emMap = categoryMap.get(catName);
+    const catRows = [];
+
+    if (emMap && emMap.size > 0) {
+      for (const [sym, d] of emMap.entries()) {
+        catRows.push([
+          sym,
+          d.dates.size,
+          d.screeners.size,
+          Array.from(d.screeners).join(", ")
+        ]);
+      }
+
+      catRows.sort((a, b) => {
+        if (b[2] !== a[2]) return b[2] - a[2]; // Frekuensi screener terbanyak
+        return b[1] - a[1];                   // Total hari terbanyak
+      });
+    }
+
+    const color = themeColors[colorIdx % themeColors.length];
+    colorIdx++;
+
+    // 1. Banner Kategori
+    const totalEmiten = catRows.length;
+    wsDash.getRange(currentRow, 1, 1, 4).merge()
+      .setValue(`🎯 KATEGORI: ${catName.toUpperCase()} (${totalEmiten} Emiten)`)
+      .setFontWeight("bold").setFontSize(11)
+      .setBackground(color.bg).setFontColor(color.text)
+      .setHorizontalAlignment("left").setVerticalAlignment("middle");
+    wsDash.setRowHeight(currentRow, 26);
+    currentRow++;
+
+    // 2. Table Column Headers
+    const headers = [["Emiten", "Total Muncul (Hari)", "Frekuensi Screener", "Daftar Screener Terkait"]];
+    wsDash.getRange(currentRow, 1, 1, 4).setValues(headers)
+      .setFontWeight("bold").setFontSize(9)
+      .setBackground("#f1f5f9").setFontColor("#334155")
+      .setHorizontalAlignment("center").setVerticalAlignment("middle")
+      .setBorder(true, true, true, true, false, false, "#cbd5e1", SpreadsheetApp.BorderStyle.SOLID);
+    wsDash.setRowHeight(currentRow, 22);
+    currentRow++;
+
+    // 3. Table Rows
+    if (catRows.length > 0) {
+      const dataRange = wsDash.getRange(currentRow, 1, catRows.length, 4);
+      dataRange.setValues(catRows).setHorizontalAlignment("center").setVerticalAlignment("middle");
+      wsDash.getRange(currentRow, 4, catRows.length, 1).setHorizontalAlignment("left"); // Screener rata kiri
+
+      // Stabilo hijau lembut untuk emiten yang muncul >= 2 hari
+      const backgrounds = [];
+      for (let i = 0; i < catRows.length; i++) {
+        const days = catRows[i][1];
+        const isHighlight = days >= 2;
+        backgrounds.push(isHighlight 
+          ? ["#dcfce7", "#dcfce7", "#f0fdf4", "#f0fdf4"] 
+          : ["#ffffff", "#ffffff", "#ffffff", "#ffffff"]);
+      }
+      dataRange.setBackgrounds(backgrounds)
+        .setBorder(true, true, true, true, true, true, "#e2e8f0", SpreadsheetApp.BorderStyle.SOLID);
+
+      for (let i = 0; i < catRows.length; i++) {
+        wsDash.setRowHeight(currentRow + i, 21);
+      }
+      currentRow += catRows.length;
+    } else {
+      // Baris kosong jika belum ada emiten
+      wsDash.getRange(currentRow, 1, 1, 4).merge()
+        .setValue("Belum ada data emiten untuk rentang tanggal ini.")
+        .setFontStyle("italic").setFontSize(9).setFontColor("#94a3b8")
+        .setHorizontalAlignment("center").setVerticalAlignment("middle")
+        .setBackground("#ffffff")
+        .setBorder(true, true, true, true, false, false, "#e2e8f0", SpreadsheetApp.BorderStyle.SOLID);
+      wsDash.setRowHeight(currentRow, 22);
+      currentRow++;
+    }
+
+    // Spacer antar tabel kategori
+    wsDash.getRange(currentRow, 1, 1, 4).clear();
+    wsDash.setRowHeight(currentRow, 14);
+    currentRow++;
   }
 }
 
@@ -1330,4 +1416,129 @@ function setupGuideSheetStructure() {
   wsGuide.getRange(3, 1, guideText.length, 1).setValues(guideText)
     .setFontSize(11).setFontColor("#334155");
   wsGuide.setColumnWidth(1, 850);
+}
+
+// =========================================================================
+// 8. MODAL UPDATE SCRIPT DARI GITHUB
+// =========================================================================
+function showUpdateScriptModal() {
+  const ui = SpreadsheetApp.getUi();
+  const repoRawUrl = "https://raw.githubusercontent.com/imronade/Stockbit-Screener-Movers-Saver/main/google_apps_script.js";
+  const repoUrl = "https://github.com/imronade/Stockbit-Screener-Movers-Saver";
+
+  let latestCode = "";
+  let fetchError = "";
+
+  try {
+    const response = UrlFetchApp.fetch(repoRawUrl, { muteHttpExceptions: true });
+    if (response.getResponseCode() === 200) {
+      latestCode = response.getContentText();
+    } else {
+      fetchError = `Gagal mengambil kode dari GitHub (HTTP ${response.getResponseCode()})`;
+    }
+  } catch (err) {
+    fetchError = `Koneksi gagal: ${err.message || String(err)}`;
+  }
+
+  // Escape kode agar aman disematkan di textarea HTML
+  const safeCode = latestCode
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <base target="_top">
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 16px; color: #1e293b; background: #f8fafc; }
+          .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+          .header h3 { margin: 0; font-size: 16px; color: #0f172a; display: flex; align-items: center; gap: 8px; }
+          .badge { background: #dcfce7; color: #15803d; font-size: 11px; padding: 3px 8px; border-radius: 9999px; font-weight: 600; }
+          .steps-box { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 12px; font-size: 12px; line-height: 1.5; color: #334155; }
+          .steps-box ol { margin: 0; padding-left: 18px; }
+          .steps-box li { margin-bottom: 4px; }
+          .steps-box strong { color: #0f172a; }
+          .copy-btn { width: 100%; background: #00875A; color: white; border: none; padding: 10px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: background 0.2s; }
+          .copy-btn:hover { background: #006644; }
+          .copy-btn:active { transform: scale(0.99); }
+          .code-preview { margin-top: 10px; width: 100%; height: 140px; box-sizing: border-box; font-family: monospace; font-size: 11px; background: #0f172a; color: #e2e8f0; padding: 10px; border-radius: 6px; border: 1px solid #334155; resize: none; }
+          .footer { margin-top: 12px; display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #64748b; }
+          .footer a { color: #2563eb; text-decoration: none; font-weight: 500; }
+          .footer a:hover { text-decoration: underline; }
+          .toast-copied { display: none; background: #059669; color: white; text-align: center; border-radius: 4px; padding: 6px; font-size: 12px; margin-top: 8px; font-weight: 500; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h3>🚀 Update Script Stockbit</h3>
+          <span class="badge">Official GitHub</span>
+        </div>
+
+        <div class="steps-box">
+          <ol>
+            <li>Klik tombol hijau <strong>"📋 Salin Kode Terbaru"</strong> di bawah.</li>
+            <li>Di Google Sheets, buka <strong>Extensions</strong> &gt; <strong>Apps Script</strong>.</li>
+            <li>Hapus semua isi <code>Code.gs</code> (<strong>Ctrl+A</strong> lalu Hapus), kemudian Paste (<strong>Ctrl+V</strong>).</li>
+            <li>Klik <strong>Save (Ctrl+S)</strong>, lalu <strong>Deploy</strong> &gt; <strong>Manage deployments</strong> &gt; Edit (pensil) &gt; pilih <strong>New version</strong> &gt; klik <strong>Deploy</strong>.</li>
+          </ol>
+        </div>
+
+        ${fetchError ? `
+          <div style="background:#fee2e2; color:#b91c1c; padding:8px 12px; border-radius:6px; font-size:12px; margin-bottom:10px;">
+            ⚠️ ${fetchError}. <br>Silakan buka <a href="${repoUrl}" target="_blank" style="color:#b91c1c; font-weight:bold;">GitHub Repo</a> untuk salin manual.
+          </div>
+        ` : `
+          <button class="copy-btn" id="copyBtn" onclick="copyLatestScript()">
+            📋 Salin Kode Terbaru (${(latestCode.length / 1024).toFixed(1)} KB)
+          </button>
+          <div id="toastCopied" class="toast-copied">✅ Kode berhasil disalin ke Clipboard!</div>
+          <textarea id="scriptSource" class="code-preview" readonly>${safeCode}</textarea>
+        `}
+
+        <div class="footer">
+          <span>Repository: <a href="${repoUrl}" target="_blank">Stockbit-Screener-Movers-Saver</a></span>
+          <button onclick="google.script.host.close()" style="background:transparent; border:none; color:#64748b; cursor:pointer; font-size:12px;">Tutup</button>
+        </div>
+
+        <script>
+          function copyLatestScript() {
+            var textarea = document.getElementById("scriptSource");
+            textarea.select();
+            textarea.setSelectionRange(0, 999999);
+            try {
+              navigator.clipboard.writeText(textarea.value).then(function() {
+                showSuccess();
+              }).catch(function() {
+                document.execCommand("copy");
+                showSuccess();
+              });
+            } catch (e) {
+              document.execCommand("copy");
+              showSuccess();
+            }
+          }
+
+          function showSuccess() {
+            var btn = document.getElementById("copyBtn");
+            var toast = document.getElementById("toastCopied");
+            btn.style.background = "#059669";
+            btn.innerHTML = "✅ Berhasil Disalin!";
+            toast.style.display = "block";
+            setTimeout(function() {
+              toast.style.display = "none";
+              btn.style.background = "#00875A";
+              btn.innerHTML = "📋 Salin Kode Terbaru";
+            }, 3000);
+          }
+        </script>
+      </body>
+    </html>
+  `;
+
+  const htmlOutput = HtmlService.createHtmlOutput(htmlContent)
+    .setWidth(520)
+    .setHeight(420);
+  ui.showModalDialog(htmlOutput, "Update Script Stockbit");
 }

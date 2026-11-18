@@ -262,7 +262,7 @@ Buka sheet **`calendar_view`** di Google Spreadsheet Anda. Tampilan ini didesain
 
 Terdapat dua dashboard analisis:
 * **`movers_dashboard`:** Menyajikan daftar emiten, total hari kemunculan, total irisan kategori, rincian kategori yang pernah dimasuki, dan harga penutupan terakhir.
-* **`screener_dashboard`:** Menyajikan daftar emiten, kategori strategi, total hari lolos filter, total frekuensi screener, dan daftar nama screener terkait.
+* **`screener_dashboard`:** Menyajikan **Tabel Terpisah per Kategori Strategi** (misal: *MOMENTUM*, *BREAKOUT*, *VALUE*, dll.) lengkap dengan banner warna khas, daftar emiten, total hari lolos filter, frekuensi screener, dan nama screener terkait.
 
 > [!TIP]
 > **Pilihan Semua Data (All Records):**
@@ -276,7 +276,7 @@ Di sheet **`setting_kategori`**, Anda dapat mengelompokkan berbagai nama screene
 * **Kolom A:** Nama Screener di Stockbit (harus sama persis dengan judul screener di web).
 * **Kolom B:** Kategori Strategi (misal: `MOMENTUM`, `BREAKOUT`, `SWING`, `VALUE`, `DIVIDEND`).
 
-Daftar kategori di Kolom B ini otomatis menjadi pilihan dropdown di `calendar_view` (sel `G6`).
+Daftar kategori di Kolom B ini otomatis menjadi pilihan dropdown di `calendar_view` (sel `G6`) serta mengelompokkan tabel-tabel di `screener_dashboard`.
 
 ---
 
@@ -285,12 +285,15 @@ Daftar kategori di Kolom B ini otomatis menjadi pilihan dropdown di `calendar_vi
 Di toolbar atas Google Spreadsheet, Anda memiliki menu khusus:
 ```
 🚀 Stockbit Tools
+├── 🔄 Update Script
 ├── ✨ Setup Awal / Reset
 └── 🔄 Refresh Tampilan
 ```
 
+* **`🔄 Update Script`:**
+  * Mengambil source code script terbaru langsung dari GitHub resmi secara live, menyediakan 1 tombol untuk langsung menyalin seluruh kode ke clipboard beserta panduan deploy 2 langkah.
 * **`✨ Setup Awal / Reset`:**
-  * Membangun ulang seluruh template, layout kanan-kiri, styling border, warna tema, validasi dropdown, dan merapikan urutan tab sheet dari awal.
+  * Membangun ulang seluruh template, layout kanan-kiri, tabel per kategori screener, styling border, warna tema, validasi dropdown, dan merapikan urutan tab sheet dari awal tanpa menghapus histori records.
 * **`🔄 Refresh Tampilan`:**
   * **1-Klik untuk Semua:** Otomatis memperbarui data Kalender Movers, Kalender Screener, Movers Dashboard, Screener Dashboard, dan memastikan urutan sheet tetap rapi.
 
