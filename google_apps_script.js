@@ -32,9 +32,9 @@
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
   ui.createMenu("🚀 Stockbit Tools")
-    .addItem("🔄 Update Script", "showUpdateScriptModal")
-    .addSeparator()
     .addItem("✨ Setup Awal / Reset", "setupTemplateViews")
+    .addSeparator()
+    .addItem("🔄 Update Script", "showUpdateScriptModal")
     .addSeparator()
     .addItem("🔄 Refresh Tampilan", "updateAllViews")
     .addToUi();

@@ -285,15 +285,15 @@ Daftar kategori di Kolom B ini otomatis menjadi pilihan dropdown di `calendar_vi
 Di toolbar atas Google Spreadsheet, Anda memiliki menu khusus:
 ```
 🚀 Stockbit Tools
-├── 🔄 Update Script
 ├── ✨ Setup Awal / Reset
+├── 🔄 Update Script
 └── 🔄 Refresh Tampilan
 ```
 
-* **`🔄 Update Script`:**
-  * Mengambil source code script terbaru langsung dari GitHub resmi secara live, menyediakan 1 tombol untuk langsung menyalin seluruh kode ke clipboard beserta panduan deploy 2 langkah.
 * **`✨ Setup Awal / Reset`:**
   * Membangun ulang seluruh template, layout kanan-kiri, tabel per kategori screener, styling border, warna tema, validasi dropdown, dan merapikan urutan tab sheet dari awal tanpa menghapus histori records.
+* **`🔄 Update Script`:**
+  * Mengambil source code script terbaru langsung dari GitHub resmi secara live, menyediakan 1 tombol untuk langsung menyalin seluruh kode ke clipboard beserta panduan deploy 2 langkah.
 * **`🔄 Refresh Tampilan`:**
   * **1-Klik untuk Semua:** Otomatis memperbarui data Kalender Movers, Kalender Screener, Movers Dashboard, Screener Dashboard, dan memastikan urutan sheet tetap rapi.
 
