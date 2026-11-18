@@ -254,7 +254,8 @@
   }
 
   async function syncScreenerToGoogleSheets() {
-    const webhookUrl = await getSavedGSheetUrl();
+    const rawUrl = await getSavedGSheetUrl();
+    const webhookUrl = (rawUrl || '').trim();
     if (!webhookUrl) {
       openSettingsModal('Harap isi Web App URL terlebih dahulu.');
       return;
@@ -946,7 +947,8 @@
       e.stopPropagation();
       e.preventDefault();
 
-      let savedUrl = await getSavedGSheetUrl();
+      let rawUrl = await getSavedGSheetUrl();
+      let savedUrl = (rawUrl || '').trim();
       if (!savedUrl) {
         showToast('⚙️ Harap isi URL Web App Google Sheets terlebih dahulu.');
         openSettingsModal();

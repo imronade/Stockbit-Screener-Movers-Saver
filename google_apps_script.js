@@ -115,10 +115,16 @@ function doPost(e) {
           .setMimeType(ContentService.MimeType.JSON);
       }
 
-      let wsMovers = ss.getSheetByName("movers_records");
+      let wsMovers = getSheetCaseInsensitive(ss, "movers_records");
       if (!wsMovers) {
-        setupTemplateViews();
-        wsMovers = ss.getSheetByName("movers_records");
+        wsMovers = ss.insertSheet("movers_records");
+        const moversHeaders = [["Tanggal", "Kategori", "Emiten", "Price", "IDX Points", "% IDX Mov", "Value", "Volume", "Freq", "Net Foreign"]];
+        wsMovers.getRange("A1:J1").setValues(moversHeaders)
+          .setFontWeight("bold")
+          .setBackground("#1e40af")
+          .setFontColor("#ffffff")
+          .setHorizontalAlignment("center");
+        wsMovers.setFrozenRows(1);
       }
 
       const rows = records.map(r => [
@@ -153,11 +159,17 @@ function doPost(e) {
           .setMimeType(ContentService.MimeType.JSON);
       }
 
-      let wsScreener = ss.getSheetByName("screener_records");
-      const settingSheet = ss.getSheetByName("setting_kategori");
+      let wsScreener = getSheetCaseInsensitive(ss, "screener_records");
+      const settingSheet = getSheetCaseInsensitive(ss, "setting_kategori");
       if (!wsScreener) {
-        setupTemplateViews();
-        wsScreener = ss.getSheetByName("screener_records");
+        wsScreener = ss.insertSheet("screener_records");
+        const scrHeaders = [["No", "Tanggal", "Hari", "Nama Screener", "Kategori", "Emiten", "Harga Penutupan"]];
+        wsScreener.getRange("A1:G1").setValues(scrHeaders)
+          .setFontWeight("bold")
+          .setBackground("#00875A")
+          .setFontColor("#ffffff")
+          .setHorizontalAlignment("center");
+        wsScreener.setFrozenRows(1);
       }
 
       const categoryMap = getCategoryMapping(settingSheet);
@@ -256,6 +268,26 @@ function doGet(e) {
 // =========================================================================================
 // HELPER FUNCTIONS
 // =========================================================================================
+function getSheetCaseInsensitive(ss, targetName) {
+  if (!ss || !targetName) return null;
+  const direct = ss.getSheetByName(targetName);
+  if (direct) return direct;
+  const targetLower = targetName.toLowerCase().trim();
+  const sheets = ss.getSheets();
+  for (const s of sheets) {
+    if (s.getName().toLowerCase().trim() === targetLower) {
+      return s;
+    }
+  }
+  return null;
+}
+
+function safeToast(msg, title = "Info", timeout = 3) {
+  try {
+    SpreadsheetApp.getActiveSpreadsheet().toast(msg, title, timeout);
+  } catch (_) {}
+}
+
 function parseDateToYMD(val) {
   if (!val) return "";
   if (val instanceof Date) {
@@ -339,7 +371,7 @@ function setupTemplateViews() {
   setupScreenerDashboardStructure();
 
   // 5. Sheet: movers_records
-  let wsMoversRec = ss.getSheetByName("movers_records");
+  let wsMoversRec = getSheetCaseInsensitive(ss, "movers_records");
   if (!wsMoversRec) wsMoversRec = ss.insertSheet("movers_records");
   if (wsMoversRec.getLastRow() === 0) {
     const moversHeaders = [["Tanggal", "Kategori", "Emiten", "Price", "IDX Points", "% IDX Mov", "Value", "Volume", "Freq", "Net Foreign"]];
@@ -352,7 +384,7 @@ function setupTemplateViews() {
   }
 
   // 6. Sheet: screener_records
-  let wsScreenerRec = ss.getSheetByName("screener_records");
+  let wsScreenerRec = getSheetCaseInsensitive(ss, "screener_records");
   if (!wsScreenerRec) wsScreenerRec = ss.insertSheet("screener_records");
   if (wsScreenerRec.getLastRow() === 0) {
     const scrHeaders = [["No", "Tanggal", "Hari", "Nama Screener", "Kategori", "Emiten", "Harga Penutupan"]];
@@ -365,7 +397,7 @@ function setupTemplateViews() {
   }
 
   // 7. Sheet: setting_kategori
-  let wsKat = ss.getSheetByName("setting_kategori");
+  let wsKat = getSheetCaseInsensitive(ss, "setting_kategori");
   if (!wsKat) wsKat = ss.insertSheet("setting_kategori");
   if (wsKat.getLastRow() === 0) {
     wsKat.getRange("A1:B1").setValues([["Nama Screener (Stockbit)", "Kategori Strategi"]])
@@ -394,7 +426,7 @@ function setupTemplateViews() {
   renderScreenerDashboard();
   updateCategoryDropdown();
 
-  SpreadsheetApp.getActiveSpreadsheet().toast("Setup Awal Selesai! Urutan sheet berhasil diatur.", "Sukses", 5);
+  safeToast("Setup Awal Selesai! Urutan sheet berhasil diatur.", "Sukses", 5);
 }
 
 /**
@@ -421,7 +453,7 @@ function reorderAllSheets() {
 
   for (let i = 0; i < desiredOrder.length; i++) {
     const sName = desiredOrder[i];
-    const sheet = ss.getSheetByName(sName);
+    const sheet = getSheetCaseInsensitive(ss, sName);
     if (sheet) {
       ss.setActiveSheet(sheet);
       ss.moveActiveSheet(i + 1);
@@ -429,7 +461,7 @@ function reorderAllSheets() {
   }
 
   // Hapus Sheet1 default jika kosong
-  const defaultSheet = ss.getSheetByName("Sheet1") || ss.getSheetByName("Sheet 1");
+  const defaultSheet = getSheetCaseInsensitive(ss, "Sheet1") || getSheetCaseInsensitive(ss, "Sheet 1");
   if (defaultSheet && ss.getSheets().length > 1 && defaultSheet.getLastRow() === 0) {
     try {
       ss.deleteSheet(defaultSheet);
@@ -437,7 +469,7 @@ function reorderAllSheets() {
   }
 
   // Aktifkan sheet 'panduan_penggunaan'
-  const firstSheet = ss.getSheetByName("panduan_penggunaan");
+  const firstSheet = getSheetCaseInsensitive(ss, "panduan_penggunaan");
   if (firstSheet) ss.setActiveSheet(firstSheet);
 }
 
@@ -446,8 +478,37 @@ function reorderAllSheets() {
 // =========================================================================================
 function setupCalendarSheetStructure() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let wsCal = ss.getSheetByName("calendar_view");
+  let wsCal = getSheetCaseInsensitive(ss, "calendar_view");
   if (!wsCal) wsCal = ss.insertSheet("calendar_view", 0);
+
+  // Pertahankan filter dan checklist yang sudah dipilih user sebelumnya (jika ada)
+  let curYear = String(new Date().getFullYear());
+  const monthNames = getMonthNamesList();
+  let curMonth = monthNames[new Date().getMonth()];
+  let curCategory = "SEMUA KATEGORI";
+  let curChecksRow1 = [true, false, false, false, false];
+  let curChecksRow2 = [false, false];
+
+  try {
+    const yVal = wsCal.getRange("E3").getValue();
+    if (yVal) curYear = String(yVal).trim();
+    const mVal = wsCal.getRange("H3").getValue();
+    if (mVal) curMonth = String(mVal).trim();
+    const catVal = wsCal.getRange("G6").getValue();
+    if (catVal) curCategory = String(catVal).trim();
+
+    // Ambil status checklist baris 6 jika sudah ada
+    const c1 = wsCal.getRange("A6:E6").getValues()[0];
+    if (Array.isArray(c1) && c1.length === 5 && typeof c1[0] === "boolean") {
+      curChecksRow1 = c1;
+    }
+    // Ambil status checklist baris 8 jika sudah ada
+    const c2 = wsCal.getRange("A8:B8").getValues()[0];
+    if (Array.isArray(c2) && c2.length === 2 && typeof c2[0] === "boolean") {
+      curChecksRow2 = c2;
+    }
+  } catch (_) {}
+
   wsCal.clear();
   wsCal.setFrozenRows(0);
 
@@ -466,7 +527,7 @@ function setupCalendarSheetStructure() {
   wsCal.getRange("A3:K3").clear();
   
   wsCal.getRange("D3").setValue("Tahun:").setFontWeight("bold").setHorizontalAlignment("right");
-  wsCal.getRange("E3").setValue(String(new Date().getFullYear()))
+  wsCal.getRange("E3").setValue(curYear)
     .setHorizontalAlignment("center").setFontWeight("bold")
     .setBackground("#fffbeb")
     .setBorder(true, true, true, true, false, false, "#000000", SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
@@ -474,9 +535,7 @@ function setupCalendarSheetStructure() {
   wsCal.getRange("F3").setValue("|").setFontColor("#cbd5e1").setHorizontalAlignment("center");
 
   wsCal.getRange("G3").setValue("Bulan:").setFontWeight("bold").setHorizontalAlignment("right");
-  const monthNames = getMonthNamesList();
-  const curMonthIdx = new Date().getMonth();
-  wsCal.getRange("H3").setValue(monthNames[curMonthIdx])
+  wsCal.getRange("H3").setValue(curMonth)
     .setHorizontalAlignment("center").setFontWeight("bold")
     .setBackground("#fffbeb")
     .setBorder(true, true, true, true, false, false, "#000000", SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
@@ -526,12 +585,12 @@ function setupCalendarSheetStructure() {
 
   // Baris 6: Checklist Movers Baris 1 (Kiri) & Dropdown SEMUA KATEGORI Screener (Kanan) Sejajar
   wsCal.getRange("A6:E6").insertCheckboxes()
-    .setValues([[true, false, false, false, false]])
+    .setValues([curChecksRow1])
     .setHorizontalAlignment("center").setBackground("#f8fafc");
   wsCal.getRange("F6").setBackground("#f8fafc");
 
   wsCal.getRange("G6:H6").merge()
-    .setValue("SEMUA KATEGORI")
+    .setValue(curCategory)
     .setHorizontalAlignment("center").setFontWeight("bold")
     .setBackground("#fffbeb")
     .setBorder(true, true, true, true, false, false, "#000000", SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
@@ -562,7 +621,7 @@ function setupCalendarSheetStructure() {
 
   // Baris 8: Checklist Movers Baris 2 (NFB & NFS) & Legend Emiten Berulang
   wsCal.getRange("A8:B8").insertCheckboxes()
-    .setValues([[false, false]])
+    .setValues([curChecksRow2])
     .setHorizontalAlignment("center").setBackground("#f8fafc");
 
   wsCal.getRange("C8:E8").merge()
@@ -620,9 +679,16 @@ function renderUnifiedCalendarView() {
  */
 function renderMoversCalendarPart() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const wsCal = ss.getSheetByName("calendar_view");
-  const wsMovers = ss.getSheetByName("movers_records");
+  let wsCal = getSheetCaseInsensitive(ss, "calendar_view");
+  const wsMovers = getSheetCaseInsensitive(ss, "movers_records");
   if (!wsCal || !wsMovers) return;
+
+  // Cek apakah struktur calendar_view sudah memiliki 7 kategori (A7 = 'Net Foreign Buy')
+  const a7Val = String(wsCal.getRange("A7").getValue() || "").trim();
+  if (a7Val !== "Net Foreign Buy") {
+    setupCalendarSheetStructure();
+    wsCal = getSheetCaseInsensitive(ss, "calendar_view");
+  }
 
   const year = parseInt(wsCal.getRange("E3").getValue()) || new Date().getFullYear();
   const monthStr = String(wsCal.getRange("H3").getValue());
@@ -808,9 +874,16 @@ function renderMoversCalendarPart() {
  */
 function renderScreenerCalendarPart() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const wsCal = ss.getSheetByName("calendar_view");
-  const wsScreener = ss.getSheetByName("screener_records");
+  let wsCal = getSheetCaseInsensitive(ss, "calendar_view");
+  const wsScreener = getSheetCaseInsensitive(ss, "screener_records");
   if (!wsCal || !wsScreener) return;
+
+  // Cek apakah struktur calendar_view sudah memiliki 7 kategori (A7 = 'Net Foreign Buy')
+  const a7Val = String(wsCal.getRange("A7").getValue() || "").trim();
+  if (a7Val !== "Net Foreign Buy") {
+    setupCalendarSheetStructure();
+    wsCal = getSheetCaseInsensitive(ss, "calendar_view");
+  }
 
   const year = parseInt(wsCal.getRange("E3").getValue()) || new Date().getFullYear();
   const monthStr = String(wsCal.getRange("H3").getValue());
@@ -959,7 +1032,7 @@ function renderScreenerCalendarPart() {
 // =========================================================================================
 function setupMoversDashboardStructure() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let wsDash = ss.getSheetByName("movers_dashboard");
+  let wsDash = getSheetCaseInsensitive(ss, "movers_dashboard");
   if (!wsDash) wsDash = ss.insertSheet("movers_dashboard", 3);
   wsDash.clear();
   wsDash.setFrozenRows(0);
@@ -990,8 +1063,8 @@ function setupMoversDashboardStructure() {
 
 function renderMoversDashboard() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const wsDash = ss.getSheetByName("movers_dashboard");
-  const wsRecord = ss.getSheetByName("movers_records");
+  const wsDash = getSheetCaseInsensitive(ss, "movers_dashboard");
+  const wsRecord = getSheetCaseInsensitive(ss, "movers_records");
   if (!wsDash || !wsRecord) return;
 
   // Jika tanggal dikosongkan/dihapus, otomatis memilih seluruh data tanpa batas
@@ -1072,7 +1145,7 @@ function renderMoversDashboard() {
 // =========================================================================
 function setupScreenerDashboardStructure() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let wsDash = ss.getSheetByName("screener_dashboard");
+  let wsDash = getSheetCaseInsensitive(ss, "screener_dashboard");
   if (!wsDash) wsDash = ss.insertSheet("screener_dashboard", 4);
   wsDash.clear();
   wsDash.setFrozenRows(0);
@@ -1103,8 +1176,8 @@ function setupScreenerDashboardStructure() {
 
 function renderScreenerDashboard() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const wsDash = ss.getSheetByName("screener_dashboard");
-  const wsRecord = ss.getSheetByName("screener_records");
+  const wsDash = getSheetCaseInsensitive(ss, "screener_dashboard");
+  const wsRecord = getSheetCaseInsensitive(ss, "screener_records");
   if (!wsDash || !wsRecord) return;
 
   // Jika tanggal dikosongkan/dihapus, otomatis memilih seluruh data tanpa batas
@@ -1186,8 +1259,8 @@ function renderScreenerDashboard() {
 // =========================================================================
 function updateCategoryDropdown() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const wsCal = ss.getSheetByName("calendar_view");
-  const wsKat = ss.getSheetByName("setting_kategori");
+  const wsCal = getSheetCaseInsensitive(ss, "calendar_view");
+  const wsKat = getSheetCaseInsensitive(ss, "setting_kategori");
   if (!wsCal || !wsKat) return;
 
   const categories = new Set(["SEMUA KATEGORI"]);
@@ -1218,7 +1291,7 @@ function updateAllViews() {
   renderScreenerDashboard();
   updateCategoryDropdown();
   reorderAllSheets();
-  SpreadsheetApp.getActiveSpreadsheet().toast("Seluruh tampilan & data berhasil di-refresh!", "Sukses", 3);
+  safeToast("Seluruh tampilan & data berhasil di-refresh!", "Sukses", 3);
 }
 
 // =========================================================================
@@ -1226,7 +1299,7 @@ function updateAllViews() {
 // =========================================================================
 function setupGuideSheetStructure() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let wsGuide = ss.getSheetByName("panduan_penggunaan");
+  let wsGuide = getSheetCaseInsensitive(ss, "panduan_penggunaan");
   if (!wsGuide) wsGuide = ss.insertSheet("panduan_penggunaan", 5);
   wsGuide.clear();
 
