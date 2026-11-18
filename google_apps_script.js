@@ -603,7 +603,7 @@ function setupCalendarSheetStructure() {
     .setHorizontalAlignment("center").setVerticalAlignment("middle");
   wsCal.setRowHeight(6, 25);
 
-  // Baris 7: Kategori Movers Baris 2 (Net Foreign Buy & Sell) & Info Screener
+  // Baris 7: Kategori Movers Baris 2 (Net Foreign Buy & Sell) & Info Emiten Berulang
   const moversCatsRow2 = ["Net Foreign Buy", "Net Foreign Sell"];
   wsCal.getRange("A7:B7").setValues([moversCatsRow2])
     .setFontWeight("bold").setFontSize(9).setBackground("#e2e8f0").setHorizontalAlignment("center");
@@ -616,12 +616,12 @@ function setupCalendarSheetStructure() {
   wsCal.getRange("F7").setBackground("#f8fafc");
 
   wsCal.getRange("G7:K7").merge()
-    .setValue("💡 Kalender Screener menyajikan emiten berdasarkan strategi")
-    .setFontStyle("italic").setFontSize(9).setFontColor("#475569").setBackground("#f1f5f9")
+    .setValue("🟢 Emiten hijau = muncul ≥ 2 kali dalam bulan ini")
+    .setFontStyle("italic").setFontSize(9).setFontColor("#166534").setFontWeight("bold").setBackground("#f0fdf4")
     .setHorizontalAlignment("center").setVerticalAlignment("middle");
   wsCal.setRowHeight(7, 22);
 
-  // Baris 8: Checklist Movers Baris 2 (NFB & NFS) & Legend Emiten Berulang
+  // Baris 8: Checklist Movers Baris 2 (NFB & NFS) & Legend Irisan Screener (Bintang)
   wsCal.getRange("A8:B8").insertCheckboxes()
     .setValues([curChecksRow2])
     .setHorizontalAlignment("center").setBackground("#f8fafc");
@@ -634,8 +634,8 @@ function setupCalendarSheetStructure() {
   wsCal.getRange("F8").setBackground("#f8fafc");
 
   wsCal.getRange("G8:K8").merge()
-    .setValue("🟢 Emiten hijau = muncul ≥ 2 kali dalam bulan ini")
-    .setFontStyle("italic").setFontSize(9).setFontColor("#166534").setFontWeight("bold").setBackground("#f0fdf4")
+    .setValue("⭐ Bintang = irisan screener di hari tsb (⭐⭐ = 2 screener, ⭐⭐⭐ = 3 screener, dst.)")
+    .setFontStyle("italic").setFontSize(9).setFontColor("#b45309").setFontWeight("bold").setBackground("#fef3c7")
     .setHorizontalAlignment("center").setVerticalAlignment("middle");
   wsCal.setRowHeight(8, 25);
 
@@ -805,20 +805,20 @@ function renderMoversCalendarPart() {
       const cellDateYMD = parseDateToYMD(curDate);
       const isSameMonth = (curDate.getMonth() + 1) === month;
 
-      const dateCell = wsCal.getRange(colsMovers[c] + rDate);
-      const contentCell = wsCal.getRange(colsMovers[c] + rContent);
+      const dateCellMovers = wsCal.getRange(colsMovers[c] + rDate);
+      const contentCellMovers = wsCal.getRange(colsMovers[c] + rContent);
 
       if (isSameMonth) {
         if (dateFinalEmitenMap.has(cellDateYMD)) {
           const emitenList = dateFinalEmitenMap.get(cellDateYMD);
-          dateCell.setValue(`${cellDateYMD} (${emitenList.length})`)
+          dateCellMovers.setValue(`${cellDateYMD} (${emitenList.length})`)
             .setBackground("#dbeafe") // Biru soft
             .setFontColor("#1e40af")
             .setFontWeight("bold")
             .setHorizontalAlignment("center")
             .setBorder(true, true, false, true, false, false, "#cbd5e1", SpreadsheetApp.BorderStyle.SOLID);
 
-          // Format Teks & Stabilo Hijau untuk Emiten yang Muncul Beberapa Kali
+          // Format Teks & Stabilo Hijau untuk Emiten yang Muncul Beberapa Kali di Movers
           let hasRepeatEmiten = false;
           const lines = [];
           const lineHighlightFlags = [];
@@ -850,22 +850,22 @@ function renderMoversCalendarPart() {
             currentPos = endPos + 1; // newline '\n'
           }
 
-          contentCell.setRichTextValue(richTextBuilder.build())
+          contentCellMovers.setRichTextValue(richTextBuilder.build())
             .setWrap(true).setVerticalAlignment("top").setHorizontalAlignment("center")
             .setBackground(hasRepeatEmiten ? "#f0fdf4" : "#ffffff") // Stabilo hijau lembut jika ada emiten berulang
             .setBorder(false, true, true, true, false, false, "#cbd5e1", SpreadsheetApp.BorderStyle.SOLID);
         } else {
-          dateCell.setValue(cellDateYMD)
+          dateCellMovers.setValue(cellDateYMD)
             .setBackground("#f8fafc").setFontColor("#64748b").setFontWeight("normal")
             .setHorizontalAlignment("center")
             .setBorder(true, true, false, true, false, false, "#cbd5e1", SpreadsheetApp.BorderStyle.SOLID);
 
-          contentCell.setValue("").setBackground("#ffffff")
+          contentCellMovers.setValue("").setBackground("#ffffff")
             .setBorder(false, true, true, true, false, false, "#cbd5e1", SpreadsheetApp.BorderStyle.SOLID);
         }
       } else {
-        dateCell.setValue("").setBackground("#ffffff").setBorder(false, false, false, false, false, false);
-        contentCell.setValue("").setBackground("#ffffff").setBorder(false, false, false, false, false, false);
+        dateCellMovers.setValue("").setBackground("#ffffff").setBorder(false, false, false, false, false, false);
+        contentCellMovers.setValue("").setBackground("#ffffff").setBorder(false, false, false, false, false, false);
       }
     }
   }
@@ -976,19 +976,23 @@ function renderScreenerCalendarPart() {
             .setHorizontalAlignment("center")
             .setBorder(true, true, false, true, false, false, "#cbd5e1", SpreadsheetApp.BorderStyle.SOLID);
 
-          // Format Teks & Stabilo Hijau untuk Emiten yang Muncul Beberapa Kali
+          // Format Teks & Stabilo Hijau untuk Emiten yang Muncul Beberapa Kali + Simbol Bintang Irisan Screener
           let hasRepeatEmiten = false;
           const lines = [];
           const lineHighlightFlags = [];
 
           for (const sym of emitenList) {
+            const screenerSet = emitenMap.get(sym) || new Set();
+            const screenerCount = screenerSet.size;
+            const stars = screenerCount >= 2 ? " " + "⭐".repeat(screenerCount) : "";
             const freq = emitenFreqMap.get(sym) || 1;
+
             if (freq >= 2) {
-              lines.push(`${sym} (${freq}x) 🟢`);
+              lines.push(`${sym}${stars} (${freq}x) 🟢`);
               lineHighlightFlags.push(true);
               hasRepeatEmiten = true;
             } else {
-              lines.push(sym);
+              lines.push(`${sym}${stars}`);
               lineHighlightFlags.push(false);
             }
           }

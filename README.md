@@ -225,8 +225,8 @@ Buka sheet **`calendar_view`** di Google Spreadsheet Anda. Tampilan ini didesain
 | ⚡ MOVERS CALENDAR & FILTER IRISAN         | | | 🎯 SCREENER CALENDAR                             |
 | [Top Gainer][Top Loser]... (A5:E5)         | | | Kategori Screener: (G5:H5)                       |
 | [   ✓   ]   [       ]  ... (A6:E6)         | | | [ SEMUA KATEGORI ▼ ] (G6:H6)                     |
-| [Net Foreign Buy] [Net Foreign Sell] (A7:B7)| | | Info & Tips Screener                             |
-| [   ✓   ]         [       ]          (A8:B8)| | | 🟢 Emiten hijau = muncul ≥ 2 kali dalam bulan    |
+| [Net Foreign Buy] [Net Foreign Sell] (A7:B7)| | | 🟢 Emiten hijau = muncul ≥ 2 kali dalam bulan    |
+| [   ✓   ]         [       ]          (A8:B8)| | | ⭐ Bintang = irisan screener (⭐⭐ = 2, ⭐⭐⭐ = 3) |
 +--------------------------------------------+ | +--------------------------------------------------+
 | Senin   | Selasa  | Rabu    | Kamis  | Jumat| | | Senin   | Selasa  | Rabu    | Kamis  | Jumat     |
 | (Kol A) | (Kol B) | (Kol C) | (Kol D)|(Kol E)| | (Kol G) | (Kol H) | (Kol I) | (Kol J)| (Kol K)   |
@@ -250,9 +250,12 @@ Buka sheet **`calendar_view`** di Google Spreadsheet Anda. Tampilan ini didesain
 4. **Analisis Silang (*Cross-Check*):**
    * Karena baris tanggalnya sejajar lurus dari kiri ke kanan, Anda bisa melihat dalam sekejap pada baris hari yang sama (misal hari Selasa, 4 November):
      > *"Saham apa yang lolos Screener Momentum hari ini sekaligus masuk ke jajaran Top Movers / Net Foreign Buy?"* (Contoh: jika `BBCA` muncul di kedua sisi).
-5. **Stabilo Hijau Emiten Berulang (Hot Stocks):**
-   * Saham yang konsisten muncul di beberapa tanggal berbeda dalam bulan yang sama (misal `MSJA` muncul tgl 11 dan 12) otomatis ditandai:
-     * Diberi **warna teks hijau tebal** dengan badge jumlah kemunculan: `MSJA (2x) 🟢`.
+5. **Simbol Bintang Irisan Screener (Multi-Strategy Hit) & Stabilo Hijau:**
+   * **Simbol Bintang (⭐):** Jika suatu emiten lolos di $\ge 2$ screener berbeda pada tanggal yang sama, otomatis diberi simbol bintang sebanyak jumlah screener yang ditembus:
+     * `BBCA ⭐⭐` = Lolos di 2 strategi screener sekaligus hari itu.
+     * `BBCA ⭐⭐⭐` = Lolos di 3 strategi screener sekaligus hari itu, dst.
+   * **Stabilo Hijau & Badge Tanggal (🟢):** Saham yang konsisten muncul di beberapa tanggal berbeda dalam bulan yang sama otomatis ditandai:
+     * Diberi **warna teks hijau tebal** dengan badge jumlah kemunculan: `MSJA ⭐⭐ (2x) 🟢`.
      * Kotak sel tanggal otomatis diberi **stabilo background hijau lembut** (`#f0fdf4`) sehingga hari-hari bursa yang memiliki saham konsisten langsung terlihat mencolok.
      * Di `movers_dashboard` & `screener_dashboard`, baris emiten yang muncul $\ge 2$ hari otomatis diberi **stabilo hijau** (`#dcfce7`).
 
