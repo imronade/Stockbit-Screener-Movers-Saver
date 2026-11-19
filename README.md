@@ -64,6 +64,10 @@ Ekstensi browser terpadu untuk **Google Chrome**, **Microsoft Edge**, **Brave Br
   * Tampilan saham yang lolos multi-screener pada kalender disederhanakan menjadi format angka bintang yang bersih: **`2⭐`** (lolos 2 screener), **`3⭐`** (lolos 3 screener), **`4⭐`**, dst.
   * Menggantikan format deretan bintang bertumpuk (`⭐⭐⭐`) agar tampilan sel rapi dan tidak memakan lebar kolom.
   * Legenda sel `G8:K8` di sheet `calendar_view` diperbarui menjadi: `⭐ Bintang = irisan screener di hari tsb (2⭐ = 2 screener, 3⭐ = 3 screener, dst.)`.
+* **Penyempurnaan Dialog Update Script & Indikator Status Mutakhir:**
+  * Jendela pop-up `🔄 Update Script` kini menyajikan status visual yang tegas dan bersih:
+    * **Jika Sudah Versi Terbaru:** Menampilkan kartu hijau hero **`✅ SCRIPT SUDAH TERBARU`**, tabel perbandingan versi terpasang vs GitHub, ringkasan fitur aktif, dan menyembunyikan kode sumber ke dalam menu lipat (*accordion*) dengan tombol **`✅ Selesai (Tutup Jendela)`**.
+    * **Notifikasi Toast Otomatis:** Di pojok kanan bawah spreadsheet langsung muncul toast konfirmasi `✅ Script Up to Date: Script sudah versi terbaru (v1.3.1)!`.
 
 ### 📌 Versi 1.3.0
 * **Filter Mode Khusus Irisan di Dropdown `G6`:**
@@ -339,9 +343,9 @@ Di toolbar atas Google Spreadsheet, Anda memiliki menu khusus:
 * **`✨ Setup Awal / Reset`:**
   * Membangun ulang seluruh template, layout kanan-kiri, tabel per kategori screener, styling border, warna tema, validasi dropdown, dan merapikan urutan tab sheet dari awal tanpa menghapus histori records.
 * **`🔄 Update Script`:**
-  * Memeriksa versi script saat ini dengan repository GitHub resmi secara live:
-    * Jika sudah sama, menampilkan status **`✅ Script Up to Date`** sehingga Anda tidak perlu repot update.
-    * Jika ada versi baru, menampilkan badge **`⚡ Update Tersedia`**, ringkasan versi baru, dan 1 tombol **"📋 Salin Kode Terbaru"** ke clipboard beserta panduan deploy 2 langkah.
+  * Memeriksa versi script aktif di Google Sheets Anda dengan kode resmi di repositori GitHub secara *live*:
+    * **Jika Versi Sudah Mutakhir:** Menampilkan kartu hijau **`✅ SCRIPT SUDAH TERBARU`**, notifikasi toast konfirmasi, rincian versi (Terpasang vs GitHub), daftar fitur aktif, dan menyembunyikan kode sumber ke menu lipat agar tampilan bersih.
+    * **Jika Ada Versi Baru:** Menampilkan badge **`⚡ UPDATE TERSEDIA`**, ringkasan pembaruan, tombol 1-klik **"📋 Salin Seluruh Kode Terbaru"** ke clipboard, dan panduan praktis 4 langkah update ke `Code.gs`.
 * **`🔄 Refresh Tampilan`:**
   * **1-Klik untuk Semua:** Otomatis memperbarui data Kalender Movers, Kalender Screener, Movers Dashboard, Screener Dashboard, dan memastikan urutan sheet tetap rapi.
 
