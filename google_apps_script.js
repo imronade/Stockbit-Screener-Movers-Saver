@@ -29,7 +29,7 @@
 // =========================================================================================
 // KONFIGURASI VERSI SCRIPT
 // =========================================================================================
-const SCRIPT_VERSION = "1.2.0";
+const SCRIPT_VERSION = "1.3.0";
 
 /**
  * Menu Kustom di Google Sheets saat file dibuka
@@ -897,34 +897,93 @@ function renderScreenerCalendarPart() {
   const month = parseMonthIndex(monthStr);
   const selectedCat = String(wsCal.getRange("G6").getValue() || "SEMUA KATEGORI").trim();
 
-  // Baca data Screener
+  // Baca data Screener dengan deteksi kolom dinamis
   const lastRow = wsScreener.getLastRow();
-  const data = lastRow > 1 ? wsScreener.getRange(2, 1, lastRow - 1, 7).getValues() : [];
+  const lastCol = Math.max(wsScreener.getLastColumn(), 7);
+  const data = lastRow > 1 ? wsScreener.getRange(2, 1, lastRow - 1, lastCol).getValues() : [];
 
-  const dateMap = new Map();
+  let colDate = 1;
+  let colScreener = 3;
+  let colCat = 4;
+  let colEmiten = 5;
+
+  if (lastRow > 0) {
+    const headers = wsScreener.getRange(1, 1, 1, lastCol).getValues()[0].map(h => String(h || "").trim().toLowerCase());
+    const idxDate = headers.indexOf("tanggal");
+    if (idxDate !== -1) colDate = idxDate;
+
+    let idxScr = headers.indexOf("nama screener");
+    if (idxScr === -1) idxScr = headers.indexOf("screener");
+    if (idxScr !== -1) colScreener = idxScr;
+
+    const idxCat = headers.indexOf("kategori");
+    if (idxCat !== -1) colCat = idxCat;
+
+    let idxEm = headers.indexOf("emiten");
+    if (idxEm === -1) idxEm = headers.indexOf("symbol");
+    if (idxEm === -1) idxEm = headers.indexOf("saham");
+    if (idxEm !== -1) colEmiten = idxEm;
+  }
+
+  // 1. Kumpulkan semua screener unik & kategori per emiten per tanggal secara global
+  // dateDailyScreeners: Map<dateYMD, Map<emiten, Set<screenerName>>>
+  const dateDailyScreeners = new Map();
+  // dateDailyCategories: Map<dateYMD, Map<emiten, Set<categoryLower>>>
+  const dateDailyCategories = new Map();
+
   for (const row of data) {
-    const rDate = parseDateToYMD(row[1]);
-    const rScreener = String(row[3] || "").trim();
-    const rCat = String(row[4] || "").trim();
-    const rEmiten = String(row[5] || "").trim();
+    const rDate = parseDateToYMD(row[colDate]);
+    const rScreener = String(row[colScreener] || "").trim();
+    const rCat = String(row[colCat] || "Lainnya").trim();
+    const rEmiten = String(row[colEmiten] || "").trim().toUpperCase();
 
     if (!rDate || !rEmiten) continue;
 
-    // Filter Kategori Screener
-    if (selectedCat !== "SEMUA KATEGORI" && selectedCat !== "SEMUA") {
-      if (rCat.toLowerCase() !== selectedCat.toLowerCase()) continue;
-    }
+    if (!dateDailyScreeners.has(rDate)) dateDailyScreeners.set(rDate, new Map());
+    const scrMap = dateDailyScreeners.get(rDate);
+    if (!scrMap.has(rEmiten)) scrMap.set(rEmiten, new Set());
+    if (rScreener) scrMap.get(rEmiten).add(rScreener);
 
-    if (!dateMap.has(rDate)) dateMap.set(rDate, new Map());
-    const emitenMap = dateMap.get(rDate);
-    if (!emitenMap.has(rEmiten)) emitenMap.set(rEmiten, new Set());
-    if (rScreener) emitenMap.get(rEmiten).add(rScreener);
+    if (!dateDailyCategories.has(rDate)) dateDailyCategories.set(rDate, new Map());
+    const catMap = dateDailyCategories.get(rDate);
+    if (!catMap.has(rEmiten)) catMap.set(rEmiten, new Set());
+    if (rCat) catMap.get(rEmiten).add(rCat.toLowerCase());
   }
 
-  // Hitung Frekuensi Kemunculan per Emiten di Bulan Ini (Untuk Deteksi Saham Berulang)
+  // 2. Filter emiten yang ditampilkan berdasarkan pilihan dropdown G6
+  const isOnlyIrisan = selectedCat.toUpperCase().includes("IRISAN") || selectedCat.includes("≥ 2") || selectedCat.includes(">= 2");
+  const isAllCategories = selectedCat === "SEMUA KATEGORI" || selectedCat === "SEMUA" || !selectedCat;
+
+  // dateDisplayMap: Map<dateYMD, string[]> (Daftar emiten yang lolos filter)
+  const dateDisplayMap = new Map();
+
+  for (const [dateYMD, emMap] of dateDailyScreeners.entries()) {
+    const validEmitens = [];
+    for (const [sym, screenerSet] of emMap.entries()) {
+      if (isOnlyIrisan) {
+        // Mode Hanya Irisan: Wajib muncul di minimal 2 screener berbeda pada tanggal tsb
+        if (screenerSet.size >= 2) {
+          validEmitens.push(sym);
+        }
+      } else if (isAllCategories) {
+        validEmitens.push(sym);
+      } else {
+        // Filter kategori spesifik
+        const catSet = dateDailyCategories.get(dateYMD)?.get(sym);
+        if (catSet && catSet.has(selectedCat.toLowerCase())) {
+          validEmitens.push(sym);
+        }
+      }
+    }
+    if (validEmitens.length > 0) {
+      dateDisplayMap.set(dateYMD, validEmitens.sort());
+    }
+  }
+
+  // 3. Hitung Frekuensi Kemunculan per Emiten di Bulan Ini (Untuk Deteksi Saham Berulang)
   const emitenFreqMap = new Map();
-  for (const [dateYMD, emMap] of dateMap.entries()) {
-    for (const sym of emMap.keys()) {
+  for (const [dateYMD, emList] of dateDisplayMap.entries()) {
+    for (const sym of emList) {
       emitenFreqMap.set(sym, (emitenFreqMap.get(sym) || 0) + 1);
     }
   }
@@ -970,9 +1029,8 @@ function renderScreenerCalendarPart() {
       const contentCell = wsCal.getRange(colsScreener[c] + rContent);
 
       if (isSameMonth) {
-        if (dateMap.has(cellDateYMD)) {
-          const emitenMap = dateMap.get(cellDateYMD);
-          const emitenList = Array.from(emitenMap.keys()).sort();
+        if (dateDisplayMap.has(cellDateYMD)) {
+          const emitenList = dateDisplayMap.get(cellDateYMD);
 
           dateCell.setValue(`${cellDateYMD} (${emitenList.length})`)
             .setBackground("#dcfce7") // Hijau soft
@@ -987,7 +1045,7 @@ function renderScreenerCalendarPart() {
           const lineHighlightFlags = [];
 
           for (const sym of emitenList) {
-            const screenerSet = emitenMap.get(sym) || new Set();
+            const screenerSet = dateDailyScreeners.get(cellDateYMD)?.get(sym) || new Set();
             const screenerCount = screenerSet.size;
             const stars = screenerCount >= 2 ? " " + "⭐".repeat(screenerCount) : "";
             const freq = emitenFreqMap.get(sym) || 1;
@@ -1014,7 +1072,7 @@ function renderScreenerCalendarPart() {
             } else {
               richTextBuilder.setTextStyle(currentPos, endPos, normalStyle);
             }
-            currentPos = endPos + 1;
+            currentPos = endPos + 1; // newline '\n'
           }
 
           contentCell.setRichTextValue(richTextBuilder.build())
@@ -1192,7 +1250,31 @@ function renderScreenerDashboard() {
   const endDateStr = endVal ? parseDateToYMD(endVal) : "";
 
   const lastRowRec = wsRecord.getLastRow();
-  const data = lastRowRec > 1 ? wsRecord.getRange(2, 1, lastRowRec - 1, 7).getValues() : [];
+  const lastColRec = Math.max(wsRecord.getLastColumn(), 7);
+  const data = lastRowRec > 1 ? wsRecord.getRange(2, 1, lastRowRec - 1, lastColRec).getValues() : [];
+
+  let colDate = 1;
+  let colScreener = 3;
+  let colCat = 4;
+  let colEmiten = 5;
+
+  if (lastRowRec > 0) {
+    const headers = wsRecord.getRange(1, 1, 1, lastColRec).getValues()[0].map(h => String(h || "").trim().toLowerCase());
+    const idxDate = headers.indexOf("tanggal");
+    if (idxDate !== -1) colDate = idxDate;
+
+    let idxScr = headers.indexOf("nama screener");
+    if (idxScr === -1) idxScr = headers.indexOf("screener");
+    if (idxScr !== -1) colScreener = idxScr;
+
+    const idxCat = headers.indexOf("kategori");
+    if (idxCat !== -1) colCat = idxCat;
+
+    let idxEm = headers.indexOf("emiten");
+    if (idxEm === -1) idxEm = headers.indexOf("symbol");
+    if (idxEm === -1) idxEm = headers.indexOf("saham");
+    if (idxEm !== -1) colEmiten = idxEm;
+  }
 
   // 1. Kumpulkan daftar urutan kategori dari setting_kategori agar teratur
   const categoryOrder = [];
@@ -1209,14 +1291,14 @@ function renderScreenerDashboard() {
   const categoryMap = new Map();
 
   for (const row of data) {
-    const rDate = parseDateToYMD(row[1]);
+    const rDate = parseDateToYMD(row[colDate]);
     if (!rDate) continue;
     if (startDateStr && rDate < startDateStr) continue;
     if (endDateStr && rDate > endDateStr) continue;
 
-    const rScreener = String(row[3] || "").trim();
-    const rCat = String(row[4] || "Lainnya").trim() || "Lainnya";
-    const rEmiten = String(row[5] || "").trim();
+    const rScreener = String(row[colScreener] || "").trim();
+    const rCat = String(row[colCat] || "Lainnya").trim() || "Lainnya";
+    const rEmiten = String(row[colEmiten] || "").trim().toUpperCase();
 
     if (!rEmiten) continue;
 
@@ -1356,21 +1438,19 @@ function updateCategoryDropdown() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const wsCal = getSheetCaseInsensitive(ss, "calendar_view");
   const wsKat = getSheetCaseInsensitive(ss, "setting_kategori");
-  if (!wsCal || !wsKat) return;
+  if (!wsCal) return;
 
-  const categories = new Set(["SEMUA KATEGORI"]);
-  const lastRow = wsKat.getLastRow();
-  if (lastRow > 1) {
-    const vals = wsKat.getRange(2, 2, lastRow - 1, 1).getValues();
+  const categories = ["SEMUA KATEGORI", "⭐ HANYA IRISAN (≥ 2 SCREENER)"];
+  if (wsKat && wsKat.getLastRow() > 1) {
+    const vals = wsKat.getRange(2, 2, wsKat.getLastRow() - 1, 1).getValues();
     vals.forEach(r => {
       const v = String(r[0] || "").trim();
-      if (v) categories.add(v);
+      if (v && !categories.includes(v)) categories.push(v);
     });
   }
 
-  const catList = Array.from(categories);
   const rule = SpreadsheetApp.newDataValidation()
-    .requireValueInList(catList, true)
+    .requireValueInList(categories, true)
     .setAllowInvalid(true)
     .build();
 

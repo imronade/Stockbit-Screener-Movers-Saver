@@ -245,8 +245,10 @@ Buka sheet **`calendar_view`** di Google Spreadsheet Anda. Tampilan ini didesain
    * **Fitur Irisan Penuh (*Full Intersection*):** Jika Anda mencentang *Top Gainer* dan *Net Foreign Buy*, kalender hanya akan menampilkan saham yang berhasil masuk ke **kedua** kategori tersebut (saham yang naik dan diborong asing pada hari yang sama).
    * Anda bebas mengombinasikan kategori manapun (*misal: Top Value + Net Foreign Buy*).
 3. **Sisi Kanan (Screener):**
-   * Di sel `G6` terdapat dropdown kategori strategi (misal: `SEMUA KATEGORI`, `MOMENTUM`, `BREAKOUT`, `VALUE`, `SWING`).
-   * Pilih kategori untuk menyaring emiten yang lolos pada hari tersebut.
+   * Di sel `G6` terdapat dropdown filter:
+     * **`SEMUA KATEGORI`:** Menampilkan semua emiten yang lolos screener pada hari tersebut. Jika ada emiten yang lolos $\ge 2$ screener berbeda di hari yang sama, otomatis diberi bintang (`⭐⭐`, `⭐⭐⭐`, dst.).
+     * **`⭐ HANYA IRISAN (≥ 2 SCREENER)`:** Mode khusus irisan! Kalender hanya akan menampilkan saham-saham pilihan yang berhasil menembus minimal 2 screener sekaligus pada hari tersebut (saham yang hanya lolos 1 screener otomatis disembunyikan).
+     * **Kategori Tertentu (misal: `MOMENTUM`, `BREAKOUT`, `VALUE`):** Menyaring emiten berdasarkan kelompok strategi dari sheet `setting_kategori`, dengan tanda bintang tetap aktif menghitung seluruh screener yang ditembus hari itu.
 4. **Analisis Silang (*Cross-Check*):**
    * Karena baris tanggalnya sejajar lurus dari kiri ke kanan, Anda bisa melihat dalam sekejap pada baris hari yang sama (misal hari Selasa, 4 November):
      > *"Saham apa yang lolos Screener Momentum hari ini sekaligus masuk ke jajaran Top Movers / Net Foreign Buy?"* (Contoh: jika `BBCA` muncul di kedua sisi).
