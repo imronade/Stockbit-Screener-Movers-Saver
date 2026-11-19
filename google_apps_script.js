@@ -29,7 +29,7 @@
 // =========================================================================================
 // KONFIGURASI VERSI SCRIPT
 // =========================================================================================
-const SCRIPT_VERSION = "1.3.0";
+const SCRIPT_VERSION = "1.3.1";
 
 /**
  * Menu Kustom di Google Sheets saat file dibuka
@@ -639,7 +639,7 @@ function setupCalendarSheetStructure() {
   wsCal.getRange("F8").setBackground("#f8fafc");
 
   wsCal.getRange("G8:K8").merge()
-    .setValue("⭐ Bintang = irisan screener di hari tsb (⭐⭐ = 2 screener, ⭐⭐⭐ = 3 screener, dst.)")
+    .setValue("⭐ Bintang = irisan screener di hari tsb (2⭐ = 2 screener, 3⭐ = 3 screener, dst.)")
     .setFontStyle("italic").setFontSize(9).setFontColor("#b45309").setFontWeight("bold").setBackground("#fef3c7")
     .setHorizontalAlignment("center").setVerticalAlignment("middle");
   wsCal.setRowHeight(8, 25);
@@ -1047,7 +1047,7 @@ function renderScreenerCalendarPart() {
           for (const sym of emitenList) {
             const screenerSet = dateDailyScreeners.get(cellDateYMD)?.get(sym) || new Set();
             const screenerCount = screenerSet.size;
-            const stars = screenerCount >= 2 ? " " + "⭐".repeat(screenerCount) : "";
+            const stars = screenerCount >= 2 ? ` ${screenerCount}⭐` : "";
             const freq = emitenFreqMap.get(sym) || 1;
 
             if (freq >= 2) {
