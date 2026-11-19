@@ -1538,13 +1538,20 @@ function showUpdateScriptModal() {
     fetchError = `Koneksi gagal: ${err.message || String(err)}`;
   }
 
+  const currentVer = typeof SCRIPT_VERSION !== "undefined" ? SCRIPT_VERSION : "1.0.0";
+
+  // Tampilkan notifikasi toast langsung di lembar spreadsheet
+  if (isUpToDate) {
+    safeToast(`Script sudah versi terbaru (v${currentVer})!`, "✅ Script Up to Date", 5);
+  } else if (!fetchError) {
+    safeToast(`Update tersedia! Versi v${githubVersion} tersedia di GitHub.`, "⚡ Update Tersedia", 5);
+  }
+
   // Escape kode agar aman disematkan di textarea HTML
   const safeCode = latestCode
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
-
-  const currentVer = typeof SCRIPT_VERSION !== "undefined" ? SCRIPT_VERSION : "1.0.0";
 
   const htmlContent = `
     <!DOCTYPE html>
@@ -1553,72 +1560,140 @@ function showUpdateScriptModal() {
         <base target="_top">
         <style>
           body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 16px; color: #1e293b; background: #f8fafc; }
-          .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+          .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
           .header h3 { margin: 0; font-size: 16px; color: #0f172a; display: flex; align-items: center; gap: 8px; }
-          .badge-uptodate { background: #dcfce7; color: #15803d; font-size: 11px; padding: 4px 10px; border-radius: 9999px; font-weight: 700; border: 1px solid #86efac; display: flex; align-items: center; gap: 4px; }
-          .badge-update-available { background: #fef3c7; color: #b45309; font-size: 11px; padding: 4px 10px; border-radius: 9999px; font-weight: 700; border: 1px solid #fde68a; display: flex; align-items: center; gap: 4px; }
-          .status-card { border-radius: 8px; padding: 12px; margin-bottom: 12px; font-size: 13px; line-height: 1.5; }
-          .status-uptodate { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; }
-          .status-update-available { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
-          .steps-box { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 12px; font-size: 12px; line-height: 1.5; color: #334155; }
+          .badge-uptodate { background: #dcfce7; color: #15803d; font-size: 11px; padding: 4px 10px; border-radius: 9999px; font-weight: 700; border: 1px solid #86efac; }
+          .badge-update-available { background: #fef3c7; color: #b45309; font-size: 11px; padding: 4px 10px; border-radius: 9999px; font-weight: 700; border: 1px solid #fde68a; }
+          .hero-uptodate { background: #f0fdf4; border: 2px solid #86efac; border-radius: 10px; padding: 18px; text-align: center; margin-bottom: 14px; }
+          .hero-update-avail { background: #fffbeb; border: 2px solid #fde68a; border-radius: 10px; padding: 16px; margin-bottom: 14px; }
+          .info-grid { display: flex; justify-content: center; gap: 14px; background: #ffffff; padding: 10px 14px; border-radius: 8px; border: 1px solid #cbd5e1; text-align: left; font-size: 12px; margin-top: 12px; }
+          .info-divider { border-right: 1px solid #e2e8f0; }
+          .features-box { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 14px; font-size: 12px; color: #334155; margin-bottom: 14px; line-height: 1.5; }
+          .steps-box { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 14px; font-size: 12px; line-height: 1.5; color: #334155; }
           .steps-box ol { margin: 0; padding-left: 18px; }
-          .steps-box li { margin-bottom: 4px; }
-          .steps-box strong { color: #0f172a; }
+          .steps-box li { margin-bottom: 5px; }
           .copy-btn { width: 100%; background: #00875A; color: white; border: none; padding: 10px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: background 0.2s; }
           .copy-btn:hover { background: #006644; }
-          .copy-btn:active { transform: scale(0.99); }
-          .code-preview { margin-top: 10px; width: 100%; height: 120px; box-sizing: border-box; font-family: monospace; font-size: 11px; background: #0f172a; color: #e2e8f0; padding: 10px; border-radius: 6px; border: 1px solid #334155; resize: none; }
-          .footer { margin-top: 12px; display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #64748b; }
+          .btn-close { width: 100%; background: #00875A; color: white; border: none; padding: 10px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; text-align: center; }
+          .btn-close:hover { background: #006644; }
+          .code-preview { margin-top: 8px; width: 100%; height: 90px; box-sizing: border-box; font-family: monospace; font-size: 11px; background: #0f172a; color: #e2e8f0; padding: 10px; border-radius: 6px; border: 1px solid #334155; resize: none; }
+          .toast-copied { display: none; background: #059669; color: white; text-align: center; border-radius: 4px; padding: 6px; font-size: 12px; margin-top: 8px; font-weight: 500; }
+          .footer { margin-top: 14px; display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #64748b; }
           .footer a { color: #2563eb; text-decoration: none; font-weight: 500; }
           .footer a:hover { text-decoration: underline; }
-          .toast-copied { display: none; background: #059669; color: white; text-align: center; border-radius: 4px; padding: 6px; font-size: 12px; margin-top: 8px; font-weight: 500; }
         </style>
       </head>
       <body>
         <div class="header">
           <h3>🚀 Status Script Stockbit</h3>
           ${isUpToDate ? `
-            <span class="badge-uptodate">✅ Script Up to Date</span>
+            <span class="badge-uptodate">✅ SCRIPT SUDAH TERBARU</span>
           ` : `
-            <span class="badge-update-available">⚡ Update Tersedia</span>
+            <span class="badge-update-available">⚡ UPDATE TERSEDIA</span>
           `}
         </div>
 
         ${fetchError ? `
-          <div style="background:#fee2e2; color:#b91c1c; padding:10px 12px; border-radius:6px; font-size:12px; margin-bottom:10px;">
-            ⚠️ ${fetchError}. <br>Silakan kunjungi <a href="${repoUrl}" target="_blank" style="color:#b91c1c; font-weight:bold;">GitHub Repo</a> untuk salin manual.
+          <div style="background:#fee2e2; color:#b91c1c; padding:12px; border-radius:8px; font-size:12px; margin-bottom:12px; border:1px solid #fca5a5;">
+            ⚠️ <b>${fetchError}</b><br>
+            Tidak dapat memeriksa versi online. Anda tetap dapat mengunjungi <a href="${repoUrl}" target="_blank" style="color:#b91c1c; font-weight:bold; text-decoration:underline;">GitHub Repository</a> untuk melihat kode terbaru secara langsung.
           </div>
         ` : isUpToDate ? `
-          <div class="status-card status-uptodate">
-            <strong>✨ Script Anda sudah versi terbaru (v${currentVer})!</strong><br>
-            Tidak ada pembaruan yang diperlukan. Script Google Sheets Anda saat ini sudah sinkron dengan versi terbaru di GitHub.
+          <div class="hero-uptodate">
+            <div style="font-size: 36px; margin-bottom: 6px;">🎉</div>
+            <div style="font-size: 16px; font-weight: 700; color: #15803d; margin-bottom: 4px;">
+              Script Google Spreadsheet Anda Sudah Versi Terbaru!
+            </div>
+            <div style="font-size: 12px; color: #166534;">
+              Tidak ada pembaruan yang diperlukan. Script Anda sudah 100% sinkron dengan GitHub.
+            </div>
+
+            <div class="info-grid">
+              <div>
+                <span style="color:#64748b; font-size:11px;">Versi Terpasang:</span><br>
+                <strong style="color:#0f172a; font-size:14px;">v${currentVer}</strong>
+              </div>
+              <div class="info-divider"></div>
+              <div>
+                <span style="color:#64748b; font-size:11px;">Versi Resmi GitHub:</span><br>
+                <strong style="color:#0f172a; font-size:14px;">v${githubVersion}</strong>
+              </div>
+              <div class="info-divider"></div>
+              <div>
+                <span style="color:#64748b; font-size:11px;">Status:</span><br>
+                <strong style="color:#15803d; font-size:13px;">🟢 Mutakhir & Aktif</strong>
+              </div>
+            </div>
           </div>
-          <div class="steps-box" style="font-size:11px;">
-            💡 Anda tetap dapat menyalin kode di bawah ini jika ingin melakukan reset atau deploy ulang.
+
+          <div class="features-box">
+            <div style="font-weight: 700; color: #0f172a; margin-bottom: 6px;">✨ Fitur-Fitur Terkini yang Sudah Aktif:</div>
+            <ul style="margin: 0; padding-left: 18px; line-height: 1.6;">
+              <li>Simbol irisan multi-screener ringkas (<b>2⭐</b>, <b>3⭐</b>, dst.)</li>
+              <li>Filter mode khusus <b>⭐ HANYA IRISAN (≥ 2 SCREENER)</b> di kalender</li>
+              <li>Penghitungan bintang irisan lintas kategori (global harian)</li>
+              <li>Tabel mandiri per kelompok strategi di <code>screener_dashboard</code></li>
+            </ul>
           </div>
-          <button class="copy-btn" id="copyBtn" onclick="copyLatestScript()" style="background:#475569;">
-            📋 Salin Ulang Kode (v${githubVersion})
+
+          <details style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; padding:8px 12px; font-size:11px; margin-bottom:14px;">
+            <summary style="cursor:pointer; font-weight:600; color:#475569;">
+              📋 Ingin salin ulang kode? Klik di sini (Opsional untuk Reset / Re-Deploy)
+            </summary>
+            <div style="margin-top:10px;">
+              <button class="copy-btn" id="copyBtn" onclick="copyLatestScript()" style="background:#475569;">
+                📋 Salin Ulang Kode (v${githubVersion})
+              </button>
+              <div id="toastCopied" class="toast-copied">✅ Kode berhasil disalin ke Clipboard!</div>
+              <textarea id="scriptSource" class="code-preview" readonly>${safeCode}</textarea>
+            </div>
+          </details>
+
+          <button class="btn-close" onclick="google.script.host.close()">
+            ✅ Selesai (Tutup Jendela)
           </button>
-          <div id="toastCopied" class="toast-copied">✅ Kode berhasil disalin ke Clipboard!</div>
-          <textarea id="scriptSource" class="code-preview" readonly>${safeCode}</textarea>
         ` : `
-          <div class="status-card status-update-available">
-            <strong>📢 Versi baru tersedia di GitHub!</strong><br>
-            Versi terpasang: <strong>v${currentVer}</strong> &rarr; Versi terbaru GitHub: <strong>v${githubVersion}</strong>
+          <div class="hero-update-avail">
+            <div style="font-size: 15px; font-weight: 700; color: #92400e; margin-bottom: 4px;">
+              📢 Tersedia Pembaruan Script Baru di GitHub!
+            </div>
+            <div style="font-size: 12px; color: #b45309;">
+              Versi baru <b>v${githubVersion}</b> membawa pembaruan fitur tampilan & stabilitas.
+            </div>
+
+            <div class="info-grid" style="border-color:#fde68a;">
+              <div>
+                <span style="color:#64748b; font-size:11px;">Versi Terpasang:</span><br>
+                <strong style="color:#dc2626; font-size:14px;">v${currentVer} (Lama)</strong>
+              </div>
+              <div class="info-divider"></div>
+              <div>
+                <span style="color:#64748b; font-size:11px;">Versi Baru GitHub:</span><br>
+                <strong style="color:#15803d; font-size:14px;">v${githubVersion} (Terbaru)</strong>
+              </div>
+              <div class="info-divider"></div>
+              <div>
+                <span style="color:#64748b; font-size:11px;">Status:</span><br>
+                <strong style="color:#b45309; font-size:13px;">⚡ Perlu Update</strong>
+              </div>
+            </div>
           </div>
+
           <div class="steps-box">
+            <div style="font-weight: 700; color: #0f172a; margin-bottom: 6px;">Langkah Update 2 Menit:</div>
             <ol>
-              <li>Klik tombol hijau <strong>"📋 Salin Kode Terbaru"</strong> di bawah.</li>
-              <li>Di Google Sheets, buka <strong>Extensions</strong> &gt; <strong>Apps Script</strong>.</li>
-              <li>Hapus semua isi <code>Code.gs</code> (<strong>Ctrl+A</strong> lalu Hapus), kemudian Paste (<strong>Ctrl+V</strong>).</li>
-              <li>Klik <strong>Save (Ctrl+S)</strong>, lalu <strong>Deploy</strong> &gt; <strong>Manage deployments</strong> &gt; Edit (pensil) &gt; pilih <strong>New version</strong> &gt; klik <strong>Deploy</strong>.</li>
+              <li>Klik tombol hijau <strong>"📋 Salin Kode Terbaru (v${githubVersion})"</strong> di bawah.</li>
+              <li>Di Google Sheets, buka <strong>Ekstensi (Extensions)</strong> &gt; <strong>Apps Script</strong>.</li>
+              <li>Hapus semua isi file <code>Code.gs</code> (<strong>Ctrl+A</strong> lalu Hapus), kemudian Paste (<strong>Ctrl+V</strong>).</li>
+              <li>Klik <strong>💾 Simpan (Save)</strong> (Ctrl+S). Jika menggunakan Web App, klik <strong>Deploy</strong> &gt; <strong>Manage deployments</strong> &gt; Edit (pensil) &gt; pilih <strong>New version</strong> &gt; klik <strong>Deploy</strong>.</li>
             </ol>
           </div>
+
           <button class="copy-btn" id="copyBtn" onclick="copyLatestScript()">
-            📋 Salin Kode Terbaru (v${githubVersion})
+            📋 Salin Seluruh Kode Terbaru (v${githubVersion})
           </button>
           <div id="toastCopied" class="toast-copied">✅ Kode berhasil disalin ke Clipboard!</div>
-          <textarea id="scriptSource" class="code-preview" readonly>${safeCode}</textarea>
+          <textarea id="scriptSource" class="code-preview" style="height:110px;" readonly>${safeCode}</textarea>
         `}
 
         <div class="footer">
@@ -1648,12 +1723,12 @@ function showUpdateScriptModal() {
             var btn = document.getElementById("copyBtn");
             var toast = document.getElementById("toastCopied");
             btn.style.background = "#059669";
-            btn.innerHTML = "✅ Berhasil Disalin!";
+            btn.innerHTML = "✅ Berhasil Disalin ke Clipboard!";
             toast.style.display = "block";
             setTimeout(function() {
               toast.style.display = "none";
-              btn.style.background = "#00875A";
-              btn.innerHTML = "📋 Salin Kode Terbaru";
+              btn.style.background = "${isUpToDate ? '#475569' : '#00875A'}";
+              btn.innerHTML = "${isUpToDate ? `📋 Salin Ulang Kode (v${githubVersion})` : `📋 Salin Seluruh Kode Terbaru (v${githubVersion})`}";
             }, 3000);
           }
         </script>
@@ -1662,7 +1737,7 @@ function showUpdateScriptModal() {
   `;
 
   const htmlOutput = HtmlService.createHtmlOutput(htmlContent)
-    .setWidth(520)
-    .setHeight(420);
+    .setWidth(540)
+    .setHeight(isUpToDate ? 470 : 540);
   ui.showModalDialog(htmlOutput, "Update Script Stockbit");
 }
