@@ -6,22 +6,23 @@ Ekstensi browser terpadu untuk **Google Chrome**, **Microsoft Edge**, **Brave Br
 
 ## 📑 Daftar Isi
 1. [Fitur Utama](#-fitur-utama)
-2. [Panduan Instalasi Ekstensi Browser](#-panduan-instalasi-ekstensi-browser)
+2. [Catatan Rilis & Fitur Terbaru (Changelog)](#-catatan-rilis--fitur-terbaru-changelog)
+3. [Panduan Instalasi Ekstensi Browser](#-panduan-instalasi-ekstensi-browser)
    * [Google Chrome](#-1-google-chrome)
    * [Microsoft Edge](#-2-microsoft-edge)
    * [Brave Browser](#-3-brave-browser)
    * [Mozilla Firefox](#-4-mozilla-firefox)
-3. [Panduan Setup Google Spreadsheet (1-Klik)](#-panduan-setup-google-spreadsheet-1-klik)
-4. [Menghubungkan Ekstensi ke Google Spreadsheet](#-menghubungkan-ekstensi-ke-google-spreadsheet)
-5. [Panduan Penggunaan Lengkap](#-panduan-penggunaan-lengkap)
+4. [Panduan Setup Google Spreadsheet (1-Klik)](#-panduan-setup-google-spreadsheet-1-klik)
+5. [Menghubungkan Ekstensi ke Google Spreadsheet](#-menghubungkan-ekstensi-ke-google-spreadsheet)
+6. [Panduan Penggunaan Lengkap](#-panduan-penggunaan-lengkap)
    * [1. Menggunakan Fitur Stockbit Screener](#1-menggunakan-fitur-stockbit-screener)
    * [2. Menggunakan Fitur Stockbit Movers](#2-menggunakan-fitur-stockbit-movers)
    * [3. Membaca Calendar View (Side-by-Side Center)](#3-membaca-calendar-view-side-by-side-center)
    * [4. Menggunakan Dashboard Rekap & Filter Tanggal](#4-menggunakan-dashboard-rekap--filter-tanggal)
    * [5. Mengatur Kategori Screener](#5-mengatur-kategori-screener-setting_kategori)
    * [6. Menggunakan Menu Toolbar Google Sheets](#6-menggunakan-menu-toolbar-google-sheets)
-6. [Struktur Lembar Kerja Spreadsheet](#-struktur-lembar-kerja-spreadsheet)
-7. [FAQ & Troubleshooting](#-faq--troubleshooting)
+7. [Struktur Lembar Kerja Spreadsheet](#-struktur-lembar-kerja-spreadsheet)
+8. [FAQ & Troubleshooting](#-faq--troubleshooting)
 
 ---
 
@@ -43,10 +44,50 @@ Ekstensi browser terpadu untuk **Google Chrome**, **Microsoft Edge**, **Brave Br
      5. `movers_records` *(database mentah movers)*
      6. `screener_records` *(database mentah screener dengan auto-detect kolom metrik baru)*
      7. `setting_kategori` *(pemetaan nama screener ke kategori strategi)*
-3. **Ekspor Offline ke Excel (.xlsx):**
+3. **Sistem Irisan Pintar & Visual Cerdas:**
+   * **Multi-Screener Hit (⭐):** Simbol bintang ringkas (`2⭐`, `3⭐`, dst.) otomatis disematkan pada saham yang lolos lebih dari 1 strategi screener pada tanggal yang sama.
+   * **Filter Khusus Irisan:** Dropdown `G6` menyediakan opsi `⭐ HANYA IRISAN (≥ 2 SCREENER)` untuk menyaring kalender agar hanya memunculkan saham-saham pilihan yang menembus banyak screener sekaligus.
+   * **Stabilo Hijau Emiten Berulang (🟢):** Saham yang konsisten muncul $\ge 2$ kali dalam sebulan otomatis diberi warna teks hijau pekat dan sel berlatar hijau lembut.
+4. **Pengecekan Versi Otomatis (Live GitHub Sync):**
+   * Menu toolbar `🔄 Update Script` otomatis mengecek status script terpasang dengan repositori GitHub (`✅ Script Up to Date` atau `⚡ Update Tersedia`).
+5. **Ekspor Offline ke Excel (.xlsx):**
    * Download data Screener atau seluruh tab Movers langsung ke file `.xlsx` lokal tanpa memerlukan koneksi Google Sheets.
-4. **1-Klik Setup Otomatis:**
+6. **1-Klik Setup Otomatis:**
    * Script menyusun seluruh layout, border, rumus, conditional formatting, warna tema, dan dropdown secara mandiri tanpa perlu upload template manual.
+
+---
+
+## 🔄 Catatan Rilis & Fitur Terbaru (Changelog)
+
+### 📌 Versi 1.3.1 (Terbaru)
+* **Format Bintang Ringkas & Hemat Ruang (`2⭐`, `3⭐`):**
+  * Tampilan saham yang lolos multi-screener pada kalender disederhanakan menjadi format angka bintang yang bersih: **`2⭐`** (lolos 2 screener), **`3⭐`** (lolos 3 screener), **`4⭐`**, dst.
+  * Menggantikan format deretan bintang bertumpuk (`⭐⭐⭐`) agar tampilan sel rapi dan tidak memakan lebar kolom.
+  * Legenda sel `G8:K8` di sheet `calendar_view` diperbarui menjadi: `⭐ Bintang = irisan screener di hari tsb (2⭐ = 2 screener, 3⭐ = 3 screener, dst.)`.
+
+### 📌 Versi 1.3.0
+* **Filter Mode Khusus Irisan di Dropdown `G6`:**
+  * Penambahan opsi **`⭐ HANYA IRISAN (≥ 2 SCREENER)`** pada dropdown kategori screener (`G6`). Saat opsi ini dipilih, kalender otomatis menyaring dan **hanya memunculkan saham yang lolos minimal 2 strategi screener** di hari tersebut (saham 1 screener otomatis disembunyikan).
+* **Penghitungan Bintang Lintas Kategori (Global):**
+  * Bintang dihitung dari seluruh screener unik harian emiten. Jika memfilter kategori tertentu (misal: *Momentum*), saham momentum yang juga lolos screener di kategori lain tetap menampilkan bintang aslinya.
+* **Deteksi Header Kolom Dinamis:**
+  * `calendar_view`, `screener_dashboard`, dan `screener_records` kini membaca letak kolom secara dinamis berdasarkan baris header 1 (`Tanggal`, `Nama Screener`, `Kategori`, `Emiten`), sehingga aman dan fleksibel jika posisi kolom bergeser.
+
+### 📌 Versi 1.2.0
+* **Pengecekan Versi Script Otomatis (Live GitHub Sync):**
+  * Modal popup `🔄 Update Script` di toolbar Spreadsheet secara langsung mencocokkan versi script lokal dengan kode resmi di repositori GitHub.
+  * Menampilkan badge **`✅ Script Up to Date`** jika sudah mutakhir, atau **`⚡ Update Tersedia`** jika ada versi baru beserta 1 tombol **"📋 Salin Seluruh Kode Script Terbaru"**.
+* **Pertukaran Posisi Legenda Baris 7 & 8:**
+  * Baris 7 (`G7:K7`): `🟢 Emiten hijau = muncul ≥ 2 kali dalam bulan ini`.
+  * Baris 8 (`G8:K8`): Keterangan simbol bintang irisan screener.
+
+### 📌 Versi 1.1.0
+* **Screener Dashboard Tabel Mandiri per Kategori:**
+  * Menyajikan tabel terpisah untuk setiap kategori strategi lengkap dengan banner warna pembeda, mempermudah pembacaan statistik dan frekuensi saham per strategi.
+* **Standarisasi Urutan Menu Toolbar:**
+  * `🚀 Stockbit Tools` disusun berurutan: 1) `✨ Setup Awal / Reset`, 2) `🔄 Update Script`, 3) `🔄 Refresh Tampilan`.
+* **Dukungan 7 Kategori Movers:**
+  * Penambahan checklist `Net Foreign Buy` dan `Net Foreign Sell` pada baris 7 & 8 kalender Movers.
 
 ---
 

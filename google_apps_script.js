@@ -2,7 +2,7 @@
  * =========================================================================================
  * STOCKBIT SCREENER & MOVERS SAVER - ALL-IN-ONE GOOGLE APPS SCRIPT
  * =========================================================================================
- * Versi: 1.0 (Unified Side-by-Side Calendar & Centralized Multi-Tool Dashboard)
+ * Versi: 1.3.1 (Unified Side-by-Side Calendar & Centralized Multi-Tool Dashboard)
  * 
  * FITUR UTAMA:
  * 1. Side-by-Side Calendar View (Senin - Jumat):
