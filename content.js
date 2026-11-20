@@ -220,6 +220,25 @@
     return rowsData.filter((r) => r.some((c) => c !== ''));
   }
 
+  /**
+   * Helper penanggalan yang mengunci zona waktu ke Asia/Jakarta (WIB / UTC+7)
+   */
+  function getWIBDate() {
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Jakarta',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+    const ymd = formatter.format(new Date()); // Format: 'YYYY-MM-DD'
+    const [y, m, d] = ymd.split('-');
+    return {
+      ymd,
+      dmy: `${d}/${m}/${y}`,
+      compact: `${y}${m}${d}`
+    };
+  }
+
   function downloadScreenerExcel() {
     if (typeof XLSX === 'undefined') {
       showToast('⚠️ Library Excel sedang dimuat, silakan coba sesaat lagi.');
@@ -233,7 +252,7 @@
     }
 
     const rawTitle = getScreenerTitle();
-    const today = new Date().toISOString().slice(0, 10);
+    const today = getWIBDate().ymd;
     const fileName = `${cleanFileName(rawTitle)}_${today}.xlsx`;
     const sheetName = cleanSheetName(rawTitle);
 
@@ -298,7 +317,7 @@
       type: 'screener',
       action: 'appendScreener',
       screenerName: screenerTitle,
-      date: new Date().toISOString().slice(0, 10),
+      date: getWIBDate().ymd,
       rows: rowsList
     };
 
@@ -430,19 +449,11 @@
   // 5. MODUL: STOCKBIT MOVERS SAVER
   // =========================================================================
   function getTodayString() {
-    const now = new Date();
-    const y = now.getFullYear();
-    const m = String(now.getMonth() + 1).padStart(2, '0');
-    const d = String(now.getDate()).padStart(2, '0');
-    return `${d}/${m}/${y}`;
+    return getWIBDate().dmy;
   }
 
   function getTodayCompact() {
-    const now = new Date();
-    const y = now.getFullYear();
-    const m = String(now.getMonth() + 1).padStart(2, '0');
-    const d = String(now.getDate()).padStart(2, '0');
-    return `${y}${m}${d}`;
+    return getWIBDate().compact;
   }
 
   function findMoversHeader() {

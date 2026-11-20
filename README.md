@@ -59,7 +59,13 @@ Ekstensi browser terpadu untuk **Google Chrome**, **Microsoft Edge**, **Brave Br
 
 ## 🔄 Catatan Rilis & Fitur Terbaru (Changelog)
 
-### 📌 Versi 1.3.2 (Terbaru)
+### 📌 Versi 1.3.3 (Terbaru)
+* **Penguncian Zona Waktu Baku UTC+7 / WIB (Asia/Jakarta):**
+  * **Standarisasi Ekstensi Browser (`content.js`):** Seluruh penanggalan ekspor file Excel (`.xlsx`) dan pengiriman data ke Google Sheets dikunci menggunakan `Intl.DateTimeFormat` dengan zona waktu paten `Asia/Jakarta` (WIB / UTC+7). Hal ini mengeliminasi masalah pergeseran tanggal ke hari kemarin saat pengambilan data dilakukan di dini hari (antara pukul 00:00 - 06:59 WIB) yang sebelumnya terpengaruh konversi UTC (`toISOString`).
+  * **Penguncian Otomatis Spreadsheet (`ensureWIBTimeZone`):** Google Apps Script secara otomatis mengunci konfigurasi zona waktu Spreadsheet ke `Asia/Jakarta` (`ss.setSpreadsheetTimeZone("Asia/Jakarta")`) baik saat menerima sinkronisasi data (`doPost`), setup template awal (`setupTemplateViews`), pembuatan kalender (`setupCalendarSheetStructure`), maupun refresh tampilan (`updateAllViews`).
+  * **Parsing & Penentuan Hari Bursa Presisi:** Fungsi `parseDateToYMD`, `getIndonesianDay`, serta indeks bulan kalender kini diproses secara eksplisit menggunakan zona waktu `Asia/Jakarta`, memastikan tanggal dan nama hari (Senin - Jumat) selalu konsisten dan akurat.
+
+### 📌 Versi 1.3.2
 * **Perbaikan Kalender Perdagangan Baku (Senin - Jumat) & Penyelarasan Tanggal:**
   * **Sinkronisasi Hari Bursa yang Sebenarnya:** Memperbaiki perhitungan kalender agar kolom *Senin - Jumat* tepat sesuai tanggal kalender masehi yang sesungguhnya (contoh: pada November 2026, tanggal 1 adalah hari Minggu sehingga hari Senin perdagangan pertama jatuh pada tanggal **2026-11-02**, bukan 2026-11-01).
   * **Dukungan Minggu Perdagangan Penuh Lintas Bulan:** Jika tanggal 1 jatuh di hari kerja selain Senin (misal: 1 Desember 2026 jatuh di hari Selasa), hari Senin pada minggu bursa tersebut (**2026-11-30**) otomatis dimunculkan dan seluruh datanya dimasukkan ke dalam kalender secara utuh.
