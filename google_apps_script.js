@@ -2,7 +2,7 @@
  * =========================================================================================
  * STOCKBIT SCREENER & MOVERS SAVER - ALL-IN-ONE GOOGLE APPS SCRIPT
  * =========================================================================================
- * Versi: 1.3.1 (Unified Side-by-Side Calendar & Centralized Multi-Tool Dashboard)
+ * Versi: 1.3.2 (Unified Side-by-Side Calendar & Centralized Multi-Tool Dashboard)
  * 
  * FITUR UTAMA:
  * 1. Side-by-Side Calendar View (Senin - Jumat):
@@ -29,7 +29,7 @@
 // =========================================================================================
 // KONFIGURASI VERSI SCRIPT
 // =========================================================================================
-const SCRIPT_VERSION = "1.3.1";
+const SCRIPT_VERSION = "1.3.2";
 
 /**
  * Menu Kustom di Google Sheets saat file dibuka
@@ -299,12 +299,17 @@ function parseDateToYMD(val) {
   if (!val) return "";
   if (val instanceof Date) {
     if (isNaN(val.getTime())) return "";
-    return Utilities.formatDate(val, "Asia/Jakarta", "yyyy-MM-dd");
+    // Menambahkan 12 jam (tengah hari) sebelum format agar aman dari pergeseran hari
+    // akibat perbedaan offset zona waktu (misal WITA UTC+8 / WIB UTC+7 / UTC)
+    const safeDate = new Date(val.getTime() + (12 * 3600 * 1000));
+    const ssTz = SpreadsheetApp.getActiveSpreadsheet() ? SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone() : "Asia/Jakarta";
+    return Utilities.formatDate(safeDate, ssTz || "Asia/Jakarta", "yyyy-MM-dd");
   }
   if (typeof val === "number") {
-    const epoch = new Date(1899, 11, 30);
+    const epoch = new Date(1899, 11, 30, 12, 0, 0);
     const d = new Date(epoch.getTime() + val * 86400000);
-    return Utilities.formatDate(d, "Asia/Jakarta", "yyyy-MM-dd");
+    const ssTz = SpreadsheetApp.getActiveSpreadsheet() ? SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone() : "Asia/Jakarta";
+    return Utilities.formatDate(d, ssTz || "Asia/Jakarta", "yyyy-MM-dd");
   }
   const s = String(val).trim();
   if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
@@ -318,6 +323,18 @@ function parseDateToYMD(val) {
     return `${y}-${m}-${d}`;
   }
   return "";
+}
+
+/**
+ * Format Date object ke YYYY-MM-DD murni berbasis getFullYear/getMonth/getDate lokal
+ * sehingga 100% bebas dari risiko geseran offset zona waktu antar-server.
+ */
+function formatDateYMD(d) {
+  if (!d || !(d instanceof Date) || isNaN(d.getTime())) return "";
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 function getIndonesianDay(date) {
@@ -349,14 +366,37 @@ function getMonthNamesList() {
 }
 
 function parseMonthIndex(monthStr) {
-  let month = new Date().getMonth() + 1;
-  const match = String(monthStr).match(/\((\d+)\)/);
-  if (match) {
-    month = parseInt(match[1]);
-  } else if (!isNaN(parseInt(monthStr))) {
-    month = parseInt(monthStr);
+  if (!monthStr) return new Date().getMonth() + 1;
+  const s = String(monthStr).trim().toLowerCase();
+
+  // 1. Cek angka dalam kurung, misal "November (11)"
+  const match = s.match(/\((\d+)\)/);
+  if (match) return parseInt(match[1], 10);
+
+  // 2. Cek jika hanya angka, misal "11"
+  const num = parseInt(s, 10);
+  if (!isNaN(num) && num >= 1 && num <= 12) return num;
+
+  // 3. Cek nama bulan Indonesia / Inggris
+  const monthMap = {
+    "januari": 1, "january": 1, "jan": 1,
+    "februari": 2, "february": 2, "feb": 2,
+    "maret": 3, "march": 3, "mar": 3,
+    "april": 4, "apr": 4,
+    "mei": 5, "may": 5,
+    "juni": 6, "june": 6, "jun": 6,
+    "juli": 7, "july": 7, "jul": 7,
+    "agustus": 8, "august": 8, "agt": 8, "aug": 8,
+    "september": 9, "sep": 9, "sept": 9,
+    "oktober": 10, "october": 10, "okt": 10, "oct": 10,
+    "november": 11, "nov": 11,
+    "desember": 12, "december": 12, "des": 12, "dec": 12
+  };
+  for (const [name, idx] of Object.entries(monthMap)) {
+    if (s.startsWith(name)) return idx;
   }
-  return month;
+
+  return new Date().getMonth() + 1;
 }
 
 // =========================================================================================
@@ -767,24 +807,47 @@ function renderMoversCalendarPart() {
     }
   }
 
-  // Hitung Frekuensi Kemunculan per Emiten di Bulan Ini (Untuk Deteksi Saham Berulang)
-  const emitenFreqMap = new Map();
-  for (const [dateYMD, emList] of dateFinalEmitenMap.entries()) {
-    for (const sym of emList) {
-      emitenFreqMap.set(sym, (emitenFreqMap.get(sym) || 0) + 1);
+  // Hitung Hari Senin Pertama & Batas Akhir Bulan (Gunakan jam 12:00 tengah hari agar bebas geseran timezone)
+  const firstDayOfMonth = new Date(year, month - 1, 1, 12, 0, 0);
+  const lastDayOfMonth = new Date(year, month, 0, 12, 0, 0);
+  const dayOfWeek = firstDayOfMonth.getDay(); // 0 = Minggu, 1 = Senin, ..., 6 = Sabtu
+
+  let startMonday;
+  if (dayOfWeek === 1) {
+    startMonday = new Date(year, month - 1, 1, 12, 0, 0);
+  } else if (dayOfWeek === 0) {
+    // Tanggal 1 adalah Minggu -> hari Senin perdagangan pertama adalah tanggal 2
+    startMonday = new Date(year, month - 1, 2, 12, 0, 0);
+  } else if (dayOfWeek === 6) {
+    // Tanggal 1 adalah Sabtu -> hari Senin perdagangan pertama adalah tanggal 3
+    startMonday = new Date(year, month - 1, 3, 12, 0, 0);
+  } else {
+    // Tanggal 1 adalah Selasa s/d Jumat (dayOfWeek 2..5) -> mundur ke hari Senin pada minggu tsb (misal 30 Nov untuk Des)
+    startMonday = new Date(year, month - 1, 1 - (dayOfWeek - 1), 12, 0, 0);
+  }
+
+  // Kumpulkan daftar tanggal yang aktif ditampilkan di kalender untuk hitung frekuensi kemunculan
+  const displayedDates = new Set();
+  for (let w = 0; w < 6; w++) {
+    const weekMonday = new Date(startMonday.getTime() + (w * 7 * 86400000));
+    weekMonday.setHours(12, 0, 0, 0);
+    if (weekMonday <= lastDayOfMonth) {
+      for (let c = 0; c < 5; c++) {
+        const curDate = new Date(weekMonday.getTime() + (c * 86400000));
+        curDate.setHours(12, 0, 0, 0);
+        displayedDates.add(formatDateYMD(curDate));
+      }
     }
   }
 
-  // Hitung Hari Senin Pertama
-  const firstDayOfMonth = new Date(year, month - 1, 1);
-  let dayOfWeek = firstDayOfMonth.getDay();
-  let startMonday;
-  if (dayOfWeek === 6) {
-    startMonday = new Date(year, month - 1, 3);
-  } else if (dayOfWeek === 0) {
-    startMonday = new Date(year, month - 1, 2);
-  } else {
-    startMonday = new Date(year, month - 1, 1 - (dayOfWeek - 1));
+  // Hitung Frekuensi Kemunculan per Emiten pada Minggu-Minggu Kalender yang Tampil
+  const emitenFreqMap = new Map();
+  for (const dateYMD of displayedDates) {
+    if (dateFinalEmitenMap.has(dateYMD)) {
+      for (const sym of dateFinalEmitenMap.get(dateYMD)) {
+        emitenFreqMap.set(sym, (emitenFreqMap.get(sym) || 0) + 1);
+      }
+    }
   }
 
   // Text Style untuk Emiten Berulang (Stabilo Hijau Tebal) & Normal
@@ -803,17 +866,19 @@ function renderMoversCalendarPart() {
     const rDate = 10 + (w * 2);
     const rContent = rDate + 1;
 
+    const weekMonday = new Date(startMonday.getTime() + (w * 7 * 86400000));
+    weekMonday.setHours(12, 0, 0, 0);
+    const isActiveWeek = weekMonday <= lastDayOfMonth;
+
     for (let c = 0; c < 5; c++) {
-      const curDate = new Date(startMonday);
-      curDate.setDate(startMonday.getDate() + (w * 7) + c);
-
-      const cellDateYMD = parseDateToYMD(curDate);
-      const isSameMonth = (curDate.getMonth() + 1) === month;
-
       const dateCellMovers = wsCal.getRange(colsMovers[c] + rDate);
       const contentCellMovers = wsCal.getRange(colsMovers[c] + rContent);
 
-      if (isSameMonth) {
+      if (isActiveWeek) {
+        const curDate = new Date(weekMonday.getTime() + (c * 86400000));
+        curDate.setHours(12, 0, 0, 0);
+        const cellDateYMD = formatDateYMD(curDate);
+
         if (dateFinalEmitenMap.has(cellDateYMD)) {
           const emitenList = dateFinalEmitenMap.get(cellDateYMD);
           dateCellMovers.setValue(`${cellDateYMD} (${emitenList.length})`)
@@ -980,24 +1045,47 @@ function renderScreenerCalendarPart() {
     }
   }
 
-  // 3. Hitung Frekuensi Kemunculan per Emiten di Bulan Ini (Untuk Deteksi Saham Berulang)
-  const emitenFreqMap = new Map();
-  for (const [dateYMD, emList] of dateDisplayMap.entries()) {
-    for (const sym of emList) {
-      emitenFreqMap.set(sym, (emitenFreqMap.get(sym) || 0) + 1);
+  // Hitung Hari Senin Pertama & Batas Akhir Bulan (Gunakan jam 12:00 tengah hari agar bebas geseran timezone)
+  const firstDayOfMonth = new Date(year, month - 1, 1, 12, 0, 0);
+  const lastDayOfMonth = new Date(year, month, 0, 12, 0, 0);
+  const dayOfWeek = firstDayOfMonth.getDay(); // 0 = Minggu, 1 = Senin, ..., 6 = Sabtu
+
+  let startMonday;
+  if (dayOfWeek === 1) {
+    startMonday = new Date(year, month - 1, 1, 12, 0, 0);
+  } else if (dayOfWeek === 0) {
+    // Tanggal 1 adalah Minggu -> hari Senin perdagangan pertama adalah tanggal 2
+    startMonday = new Date(year, month - 1, 2, 12, 0, 0);
+  } else if (dayOfWeek === 6) {
+    // Tanggal 1 adalah Sabtu -> hari Senin perdagangan pertama adalah tanggal 3
+    startMonday = new Date(year, month - 1, 3, 12, 0, 0);
+  } else {
+    // Tanggal 1 adalah Selasa s/d Jumat (dayOfWeek 2..5) -> mundur ke hari Senin pada minggu tsb (misal 30 Nov untuk Des)
+    startMonday = new Date(year, month - 1, 1 - (dayOfWeek - 1), 12, 0, 0);
+  }
+
+  // Kumpulkan daftar tanggal yang aktif ditampilkan di kalender untuk hitung frekuensi kemunculan
+  const displayedDates = new Set();
+  for (let w = 0; w < 6; w++) {
+    const weekMonday = new Date(startMonday.getTime() + (w * 7 * 86400000));
+    weekMonday.setHours(12, 0, 0, 0);
+    if (weekMonday <= lastDayOfMonth) {
+      for (let c = 0; c < 5; c++) {
+        const curDate = new Date(weekMonday.getTime() + (c * 86400000));
+        curDate.setHours(12, 0, 0, 0);
+        displayedDates.add(formatDateYMD(curDate));
+      }
     }
   }
 
-  // Hitung Hari Senin Pertama
-  const firstDayOfMonth = new Date(year, month - 1, 1);
-  let dayOfWeek = firstDayOfMonth.getDay();
-  let startMonday;
-  if (dayOfWeek === 6) {
-    startMonday = new Date(year, month - 1, 3);
-  } else if (dayOfWeek === 0) {
-    startMonday = new Date(year, month - 1, 2);
-  } else {
-    startMonday = new Date(year, month - 1, 1 - (dayOfWeek - 1));
+  // 3. Hitung Frekuensi Kemunculan per Emiten pada Minggu-Minggu Kalender yang Tampil
+  const emitenFreqMap = new Map();
+  for (const dateYMD of displayedDates) {
+    if (dateDisplayMap.has(dateYMD)) {
+      for (const sym of dateDisplayMap.get(dateYMD)) {
+        emitenFreqMap.set(sym, (emitenFreqMap.get(sym) || 0) + 1);
+      }
+    }
   }
 
   // Text Style untuk Emiten Berulang (Stabilo Hijau Tebal) & Normal
@@ -1018,17 +1106,19 @@ function renderScreenerCalendarPart() {
     const rDate = 10 + (w * 2);
     const rContent = rDate + 1;
 
+    const weekMonday = new Date(startMonday.getTime() + (w * 7 * 86400000));
+    weekMonday.setHours(12, 0, 0, 0);
+    const isActiveWeek = weekMonday <= lastDayOfMonth;
+
     for (let c = 0; c < 5; c++) {
-      const curDate = new Date(startMonday);
-      curDate.setDate(startMonday.getDate() + (w * 7) + c);
-
-      const cellDateYMD = parseDateToYMD(curDate);
-      const isSameMonth = (curDate.getMonth() + 1) === month;
-
       const dateCell = wsCal.getRange(colsScreener[c] + rDate);
       const contentCell = wsCal.getRange(colsScreener[c] + rContent);
 
-      if (isSameMonth) {
+      if (isActiveWeek) {
+        const curDate = new Date(weekMonday.getTime() + (c * 86400000));
+        curDate.setHours(12, 0, 0, 0);
+        const cellDateYMD = formatDateYMD(curDate);
+
         if (dateDisplayMap.has(cellDateYMD)) {
           const emitenList = dateDisplayMap.get(cellDateYMD);
 

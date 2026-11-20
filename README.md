@@ -59,7 +59,13 @@ Ekstensi browser terpadu untuk **Google Chrome**, **Microsoft Edge**, **Brave Br
 
 ## 🔄 Catatan Rilis & Fitur Terbaru (Changelog)
 
-### 📌 Versi 1.3.1 (Terbaru)
+### 📌 Versi 1.3.2 (Terbaru)
+* **Perbaikan Kalender Perdagangan Baku (Senin - Jumat) & Penyelarasan Tanggal:**
+  * **Sinkronisasi Hari Bursa yang Sebenarnya:** Memperbaiki perhitungan kalender agar kolom *Senin - Jumat* tepat sesuai tanggal kalender masehi yang sesungguhnya (contoh: pada November 2026, tanggal 1 adalah hari Minggu sehingga hari Senin perdagangan pertama jatuh pada tanggal **2026-11-02**, bukan 2026-11-01).
+  * **Dukungan Minggu Perdagangan Penuh Lintas Bulan:** Jika tanggal 1 jatuh di hari kerja selain Senin (misal: 1 Desember 2026 jatuh di hari Selasa), hari Senin pada minggu bursa tersebut (**2026-11-30**) otomatis dimunculkan dan seluruh datanya dimasukkan ke dalam kalender secara utuh.
+  * **Proteksi Geseran Zona Waktu (Zero-Timezone Offset):** Pembuatan dan pembacaan tanggal kalender diproteksi dengan format jam siang (12:00 tengah hari) dan ekstraksi tanggal lokal mandiri (`formatDateYMD`), menjamin 100% tanggal tidak akan pernah melompat/bergeser -1 hari akibat perbedaan zona waktu server (WIB, WITA, WIT, UTC).
+
+### 📌 Versi 1.3.1
 * **Format Bintang Ringkas & Hemat Ruang (`2⭐`, `3⭐`):**
   * Tampilan saham yang lolos multi-screener pada kalender disederhanakan menjadi format angka bintang yang bersih: **`2⭐`** (lolos 2 screener), **`3⭐`** (lolos 3 screener), **`4⭐`**, dst.
   * Menggantikan format deretan bintang bertumpuk (`⭐⭐⭐`) agar tampilan sel rapi dan tidak memakan lebar kolom.
