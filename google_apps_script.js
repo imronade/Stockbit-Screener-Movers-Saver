@@ -1724,24 +1724,24 @@ function showUpdateScriptModal() {
               </div>
               <div class="info-divider"></div>
               <div>
-                <span style="color:#64748b; font-size:11px;">Versi Resmi GitHub:</span><br>
+                <span style="color:#64748b; font-size:11px;">Versi Github:</span><br>
                 <strong style="color:#0f172a; font-size:14px;">v${githubVersion}</strong>
               </div>
               <div class="info-divider"></div>
               <div>
                 <span style="color:#64748b; font-size:11px;">Status:</span><br>
-                <strong style="color:#15803d; font-size:13px;">🟢 Mutakhir & Aktif</strong>
+                <strong style="color:#15803d; font-size:13px;">🟢 Updated</strong>
               </div>
             </div>
           </div>
 
           <div class="features-box">
-            <div style="font-weight: 700; color: #0f172a; margin-bottom: 6px;">✨ Fitur-Fitur Terkini yang Sudah Aktif:</div>
+            <div style="font-weight: 700; color: #0f172a; margin-bottom: 6px;">✨ Perbaikan & Pembaruan Terkini (v${currentVer}):</div>
             <ul style="margin: 0; padding-left: 18px; line-height: 1.6;">
-              <li>Simbol irisan multi-screener ringkas (<b>2⭐</b>, <b>3⭐</b>, dst.)</li>
-              <li>Filter mode khusus <b>⭐ HANYA IRISAN (≥ 2 SCREENER)</b> di kalender</li>
-              <li>Penghitungan bintang irisan lintas kategori (global harian)</li>
-              <li>Tabel mandiri per kelompok strategi di <code>screener_dashboard</code></li>
+              <li><b>Penguncian Zona Waktu UTC+7 / WIB:</b> Mencegah pergeseran tanggal saat sinkronisasi di dini hari & mengunci setelan lembar kerja ke <code>Asia/Jakarta</code>.</li>
+              <li><b>Penyelarasan Kalender Bursa (Senin – Jumat):</b> Tanggal awal bulan yang jatuh di tengah minggu (Oktober, Desember, April, dll.) otomatis menarik hari Senin dari bulan sebelumnya dan memasukkan seluruh datanya secara utuh.</li>
+              <li><b>Format Simbol Bintang Ringkas:</b> Irisan screener disajikan ringkas (<b>2⭐</b>, <b>3⭐</b>, dst.) hemat tempat & rapi di kolom kalender.</li>
+              <li><b>Mode Khusus Irisan di Kalender:</b> Opsi dropdown <b>⭐ HANYA IRISAN (≥ 2 SCREENER)</b> untuk menyaring saham yang menembus multi-screener harian.</li>
             </ul>
           </div>
 
