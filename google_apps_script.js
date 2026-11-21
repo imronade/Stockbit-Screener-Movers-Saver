@@ -2,7 +2,7 @@
  * =========================================================================================
  * STOCKBIT SCREENER & MOVERS SAVER - ALL-IN-ONE GOOGLE APPS SCRIPT
  * =========================================================================================
- * Versi: 1.3.5 (Perbaikan Bug Sinkronisasi Jam Bursa BEI 09.00 WIB, Akhir Pekan & Normalisasi Zona Waktu)
+ * Versi: 1.3.6 (Penambahan Tool Interaktif Koreksi Tanggal Records & Otomasi Jam Bursa BEI)
  * 
  * FITUR UTAMA:
  * 1. Side-by-Side Calendar View (Senin - Jumat):
@@ -29,7 +29,7 @@
 // =========================================================================================
 // KONFIGURASI VERSI SCRIPT
 // =========================================================================================
-const SCRIPT_VERSION = "1.3.5";
+const SCRIPT_VERSION = "1.3.6";
 
 /**
  * Menu Kustom di Google Sheets saat file dibuka
@@ -38,6 +38,8 @@ function onOpen() {
   const ui = SpreadsheetApp.getUi();
   ui.createMenu("🚀 Stockbit Tools")
     .addItem("✨ Setup Awal / Reset", "setupTemplateViews")
+    .addSeparator()
+    .addItem("🛠️ Koreksi Tanggal Records", "showFixRecordsDateModal")
     .addSeparator()
     .addItem("🔄 Update Script", "showUpdateScriptModal")
     .addSeparator()
@@ -1758,6 +1760,7 @@ function showUpdateScriptModal() {
           <div class="features-box">
             <div style="font-weight: 700; color: #0f172a; margin-bottom: 6px;">✨ Perbaikan & Pembaruan Terkini (v${currentVer}):</div>
             <ul style="margin: 0; padding-left: 18px; line-height: 1.6;">
+              <li><b>Menu Baru: 🛠️ Koreksi Tanggal Records:</b> Alat bantu 1-klik untuk memeriksa dan mengoreksi tanggal transaksi di sheet records yang sempat salah akibat jam bursa atau zona waktu.</li>
               <li><b>Sinkronisasi Otomatis Jam Buka Bursa (09.00 WIB):</b> Sebelum jam 09.00 WIB bursa hari ini belum buka, sehingga data otomatis dicatat sebagai data penutupan hari bursa sebelumnya (misal: sync Rabu &lt; 09.00 WIB = data Selasa; Senin &lt; 09.00 WIB = data Jumat).</li>
               <li><b>Sinkronisasi Akhir Pekan (Sabtu & Minggu):</b> Otomatis ditetapkan ke hari <b>Jumat</b> penutupan terakhir.</li>
               <li><b>Pengembalian Zona Waktu ke Semula:</b> Tidak mengubah setelan timezone Spreadsheet, parsing tanggal kembali mengikuti konfigurasi asli.</li>
@@ -1869,4 +1872,355 @@ function showUpdateScriptModal() {
     .setWidth(540)
     .setHeight(isUpToDate ? 470 : 540);
   ui.showModalDialog(htmlOutput, "Update Script Stockbit");
+}
+
+// =========================================================================
+// 8. ALAT BANTU KOREKSI TANGGAL RECORDS (MOVERS & SCREENER)
+// =========================================================================
+
+/**
+ * Menampilkan modal interaktif untuk melihat dan mengoreksi tanggal pada
+ * sheet 'movers_records' dan 'screener_records' secara 1-klik.
+ */
+function showFixRecordsDateModal() {
+  const ui = SpreadsheetApp.getUi();
+  const summary = getRecordsDateSummary();
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <base target="_top">
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 16px; color: #1e293b; background: #f8fafc; font-size: 13px; }
+          .header { margin-bottom: 14px; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px; }
+          .header h3 { margin: 0 0 4px 0; font-size: 16px; color: #0f172a; display: flex; align-items: center; gap: 8px; }
+          .header p { margin: 0; font-size: 11px; color: #64748b; }
+          .card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; }
+          .card-title { font-weight: 700; color: #0f172a; margin-bottom: 8px; font-size: 12px; display: flex; align-items: center; gap: 6px; }
+          .quick-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 6px; }
+          .btn-quick { background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; padding: 8px 10px; border-radius: 6px; font-weight: 600; font-size: 11px; cursor: pointer; text-align: left; transition: all 0.2s; }
+          .btn-quick:hover { background: #dbeafe; border-color: #93c5fd; }
+          .btn-quick span { display: block; font-size: 10px; color: #60a5fa; font-weight: normal; margin-top: 2px; }
+          .custom-grid { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: end; }
+          .input-group label { display: block; font-size: 11px; color: #475569; margin-bottom: 4px; font-weight: 600; }
+          .input-group input, .input-group select { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; background: #fff; }
+          .btn-submit { background: #00875A; color: white; border: none; padding: 7px 14px; border-radius: 6px; font-weight: 600; font-size: 12px; cursor: pointer; white-space: nowrap; height: 32px; }
+          .btn-submit:hover { background: #006644; }
+          .summary-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 6px; }
+          .summary-table th { background: #f1f5f9; padding: 6px 8px; text-align: left; border: 1px solid #e2e8f0; color: #475569; font-weight: 600; }
+          .summary-table td { padding: 5px 8px; border: 1px solid #e2e8f0; color: #1e293b; }
+          .badge { background: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 4px; font-weight: 600; font-size: 10px; }
+          .alert-box { padding: 8px 12px; border-radius: 6px; font-size: 11px; margin-bottom: 12px; display: none; line-height: 1.4; }
+          .alert-success { background: #dcfce7; border: 1px solid #86efac; color: #166534; }
+          .alert-error { background: #fee2e2; border: 1px solid #fca5a5; color: #991b1b; }
+          .footer { display: flex; justify-content: flex-end; margin-top: 10px; }
+          .btn-close { background: #64748b; color: white; border: none; padding: 6px 14px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+          .btn-close:hover { background: #475569; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h3>🛠️ Koreksi Tanggal Data Records</h3>
+          <p>Perbaiki tanggal transaksi saham di sheet <b>movers_records</b> & <b>screener_records</b> secara otomatis.</p>
+        </div>
+
+        <div id="alertBox" class="alert-box"></div>
+
+        <!-- 1. Tombol Cepat (1-Klik) -->
+        <div class="card">
+          <div class="card-title">⚡ Tombol Cepat Koreksi Tanggal</div>
+          <div class="quick-btns">
+            <button class="btn-quick" onclick="applyQuickFix('2026-11-21', '2026-11-20')">
+              📅 21 Nov ➔ 20 Nov (Jumat)
+              <span>Koreksi sync hari Sabtu ke penutupan Jumat</span>
+            </button>
+            <button class="btn-quick" onclick="applyQuickFix('2026-11-20', '2026-11-19')">
+              📅 20 Nov ➔ 19 Nov (Kamis)
+              <span>Koreksi sync Jumat pagi (&lt; 09.00 WIB) ke Kamis</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 2. Koreksi Kustom Tanggal Tertentu -->
+        <div class="card">
+          <div class="card-title">🎯 Koreksi Kustom Tanggal Tertentu</div>
+          <div class="custom-grid">
+            <div class="input-group">
+              <label>Tanggal Lama (yang salah):</label>
+              <input type="text" id="oldDateInput" placeholder="Contoh: 2026-11-20" />
+            </div>
+            <div class="input-group">
+              <label>Tanggal Baru (yang benar):</label>
+              <input type="text" id="newDateInput" placeholder="Contoh: 2026-11-19" />
+            </div>
+            <button class="btn-submit" id="btnCustom" onclick="applyCustomFix()">🔄 Ubah</button>
+          </div>
+          <div style="font-size: 10px; color: #94a3b8; margin-top: 6px;">
+            *Format didukung: <code>YYYY-MM-DD</code> (2026-11-20) atau <code>DD/MM/YYYY</code> (20/11/2026). Kolom Hari otomatis disesuaikan!
+          </div>
+        </div>
+
+        <!-- 3. Ringkasan Data Saat Ini -->
+        <div class="card">
+          <div class="card-title">📊 Tanggal yang Tersimpan Saat Ini di Spreadsheet</div>
+          <div id="summaryContainer">
+            ${renderSummaryTablesHtml(summary)}
+          </div>
+        </div>
+
+        <div class="footer">
+          <button class="btn-close" onclick="google.script.host.close()">Tutup</button>
+        </div>
+
+        <script>
+          function showAlert(msg, isSuccess) {
+            var b = document.getElementById("alertBox");
+            b.style.display = "block";
+            b.className = "alert-box " + (isSuccess ? "alert-success" : "alert-error");
+            b.innerHTML = (isSuccess ? "✅ " : "⚠️ ") + msg;
+          }
+
+          function setButtonsDisabled(disabled) {
+            var btns = document.querySelectorAll("button");
+            btns.forEach(function(btn) { btn.disabled = disabled; });
+          }
+
+          function applyQuickFix(oldDate, newDate) {
+            if (!confirm("Apakah Anda yakin ingin mengubah seluruh record bertanggal " + oldDate + " menjadi " + newDate + "?")) return;
+            setButtonsDisabled(true);
+            showAlert("Sedang mengoreksi tanggal data...", true);
+            google.script.run
+              .withSuccessHandler(onFixSuccess)
+              .withFailureHandler(onFixError)
+              .executeFixRecordDate(oldDate, newDate);
+          }
+
+          function applyCustomFix() {
+            var oldDate = document.getElementById("oldDateInput").value.trim();
+            var newDate = document.getElementById("newDateInput").value.trim();
+            if (!oldDate || !newDate) {
+              alert("Mohon isi kedua kolom Tanggal Lama dan Tanggal Baru!");
+              return;
+            }
+            if (!confirm("Ubah data dari tanggal " + oldDate + " menjadi " + newDate + "?")) return;
+            setButtonsDisabled(true);
+            showAlert("Sedang mengoreksi tanggal data...", true);
+            google.script.run
+              .withSuccessHandler(onFixSuccess)
+              .withFailureHandler(onFixError)
+              .executeFixRecordDate(oldDate, newDate);
+          }
+
+          function onFixSuccess(res) {
+            setButtonsDisabled(false);
+            if (res && res.success) {
+              showAlert(res.message, true);
+              if (res.summaryHtml) {
+                document.getElementById("summaryContainer").innerHTML = res.summaryHtml;
+              }
+            } else {
+              showAlert((res && res.message) ? res.message : "Gagal mengoreksi tanggal.", false);
+            }
+          }
+
+          function onFixError(err) {
+            setButtonsDisabled(false);
+            showAlert("Terjadi kesalahan: " + (err.message || String(err)), false);
+          }
+        </script>
+      </body>
+    </html>
+  `;
+
+  const htmlOutput = HtmlService.createHtmlOutput(htmlContent)
+    .setWidth(580)
+    .setHeight(560);
+  ui.showModalDialog(htmlOutput, "Koreksi Tanggal Records");
+}
+
+function renderSummaryTablesHtml(summary) {
+  let h = '';
+  if (!summary || (!summary.movers.length && !summary.screener.length)) {
+    return '<div style="color:#94a3b8; font-style:italic;">Belum ada data di sheet records.</div>';
+  }
+
+  h += '<div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">';
+
+  // Kolom Movers
+  h += '<div><b style="color:#1e40af; font-size:11px;">📈 movers_records:</b>';
+  if (!summary.movers.length) {
+    h += '<div style="color:#94a3b8; font-size:10px; margin-top:4px;">Kosong</div>';
+  } else {
+    h += '<table class="summary-table"><tr><th>Tanggal</th><th>Jumlah</th></tr>';
+    summary.movers.forEach(function(m) {
+      h += '<tr><td><code>' + m.ymd + '</code> (' + m.dmy + ')</td><td><span class="badge">' + m.count + ' baris</span></td></tr>';
+    });
+    h += '</table>';
+  }
+  h += '</div>';
+
+  // Kolom Screener
+  h += '<div><b style="color:#00875A; font-size:11px;">🔍 screener_records:</b>';
+  if (!summary.screener.length) {
+    h += '<div style="color:#94a3b8; font-size:10px; margin-top:4px;">Kosong</div>';
+  } else {
+    h += '<table class="summary-table"><tr><th>Tanggal</th><th>Hari</th><th>Jumlah</th></tr>';
+    summary.screener.forEach(function(s) {
+      h += '<tr><td><code>' + s.ymd + '</code></td><td>' + s.day + '</td><td><span class="badge">' + s.count + ' baris</span></td></tr>';
+    });
+    h += '</table>';
+  }
+  h += '</div>';
+
+  h += '</div>';
+  return h;
+}
+
+function getRecordsDateSummary() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const summary = { movers: [], screener: [] };
+
+  // 1. Movers Records
+  const wsMovers = getSheetCaseInsensitive(ss, "movers_records");
+  if (wsMovers && wsMovers.getLastRow() > 1) {
+    const data = wsMovers.getRange(2, 1, wsMovers.getLastRow() - 1, 1).getValues();
+    const map = new Map();
+    data.forEach(function(r) {
+      const ymd = parseDateToYMD(r[0]);
+      if (ymd) {
+        if (!map.has(ymd)) {
+          const parts = ymd.split("-");
+          map.set(ymd, { ymd: ymd, dmy: parts[2] + "/" + parts[1] + "/" + parts[0], count: 0 });
+        }
+        map.get(ymd).count++;
+      }
+    });
+    summary.movers = Array.from(map.values()).sort(function(a, b) { return b.ymd.localeCompare(a.ymd); });
+  }
+
+  // 2. Screener Records
+  const wsScreener = getSheetCaseInsensitive(ss, "screener_records");
+  if (wsScreener && wsScreener.getLastRow() > 1) {
+    const lastCol = wsScreener.getLastColumn();
+    const headers = wsScreener.getRange(1, 1, 1, lastCol).getValues()[0].map(function(h) { return String(h || "").trim().toLowerCase(); });
+    let colDate = headers.indexOf("tanggal");
+    let colDay = headers.indexOf("hari");
+    if (colDate === -1) colDate = 1;
+    if (colDay === -1) colDay = 2;
+
+    const data = wsScreener.getRange(2, 1, wsScreener.getLastRow() - 1, Math.max(colDate, colDay) + 1).getValues();
+    const map = new Map();
+    data.forEach(function(r) {
+      const ymd = parseDateToYMD(r[colDate]);
+      if (ymd) {
+        if (!map.has(ymd)) {
+          map.set(ymd, { ymd: ymd, day: String(r[colDay] || getIndonesianDay(ymd)), count: 0 });
+        }
+        map.get(ymd).count++;
+      }
+    });
+    summary.screener = Array.from(map.values()).sort(function(a, b) { return b.ymd.localeCompare(a.ymd); });
+  }
+
+  return summary;
+}
+
+function executeFixRecordDate(oldDateStr, newDateStr) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const oldYMD = parseDateToYMD(oldDateStr);
+  const newYMD = parseDateToYMD(newDateStr);
+
+  if (!oldYMD || !newYMD) {
+    return { success: false, message: "Format tanggal tidak valid. Gunakan format YYYY-MM-DD atau DD/MM/YYYY." };
+  }
+
+  const parts = newYMD.split("-");
+  const newDMY = `${parts[2]}/${parts[1]}/${parts[0]}`;
+  const newDay = getIndonesianDay(newYMD);
+
+  let moversCount = 0;
+  let screenerCount = 0;
+
+  // 1. Perbarui movers_records (Kolom 1: Tanggal)
+  const wsMovers = getSheetCaseInsensitive(ss, "movers_records");
+  if (wsMovers && wsMovers.getLastRow() > 1) {
+    const lastRow = wsMovers.getLastRow();
+    const range = wsMovers.getRange(2, 1, lastRow - 1, 1);
+    const vals = range.getValues();
+    let modified = false;
+
+    for (let i = 0; i < vals.length; i++) {
+      if (parseDateToYMD(vals[i][0]) === oldYMD) {
+        vals[i][0] = newDMY;
+        moversCount++;
+        modified = true;
+      }
+    }
+    if (modified) {
+      range.setValues(vals);
+    }
+  }
+
+  // 2. Perbarui screener_records (Kolom Tanggal & Kolom Hari)
+  const wsScreener = getSheetCaseInsensitive(ss, "screener_records");
+  if (wsScreener && wsScreener.getLastRow() > 1) {
+    const lastRow = wsScreener.getLastRow();
+    const lastCol = wsScreener.getLastColumn();
+    const headers = wsScreener.getRange(1, 1, 1, lastCol).getValues()[0].map(function(h) { return String(h || "").trim().toLowerCase(); });
+    let colDate = headers.indexOf("tanggal");
+    let colDay = headers.indexOf("hari");
+    if (colDate === -1) colDate = 1;
+    if (colDay === -1) colDay = 2;
+
+    const maxCol = Math.max(colDate, colDay) + 1;
+    const range = wsScreener.getRange(2, 1, lastRow - 1, maxCol);
+    const vals = range.getValues();
+    let modified = false;
+
+    for (let i = 0; i < vals.length; i++) {
+      if (parseDateToYMD(vals[i][colDate]) === oldYMD) {
+        vals[i][colDate] = newYMD;
+        vals[i][colDay] = newDay;
+        screenerCount++;
+        modified = true;
+      }
+    }
+    if (modified) {
+      range.setValues(vals);
+    }
+  }
+
+  // 3. Refresh seluruh kalender dan dashboard
+  renderUnifiedCalendarView();
+  renderMoversDashboard();
+  renderScreenerDashboard();
+
+  const total = moversCount + screenerCount;
+  if (total === 0) {
+    return {
+      success: true,
+      message: `Tidak ditemukan baris bertanggal ${oldYMD} di kedua sheet records.`,
+      summaryHtml: renderSummaryTablesHtml(getRecordsDateSummary())
+    };
+  }
+
+  return {
+    success: true,
+    message: `Berhasil mengoreksi ${moversCount} baris Movers dan ${screenerCount} baris Screener dari ${oldYMD} menjadi ${newYMD} (${newDay})!`,
+    summaryHtml: renderSummaryTablesHtml(getRecordsDateSummary())
+  };
+}
+
+/**
+ * Fungsi bantuan langsung (Quick Fix) yang bisa dijalankan langsung dari editor Apps Script
+ */
+function fixDate21To20() {
+  const res = executeFixRecordDate("2026-11-21", "2026-11-20");
+  safeToast(res.message, "Koreksi Tanggal", 5);
+}
+
+function fixDate20To19() {
+  const res = executeFixRecordDate("2026-11-20", "2026-11-19");
+  safeToast(res.message, "Koreksi Tanggal", 5);
 }

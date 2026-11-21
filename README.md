@@ -59,7 +59,15 @@ Ekstensi browser terpadu untuk **Google Chrome**, **Microsoft Edge**, **Brave Br
 
 ## 🔄 Catatan Rilis & Fitur Terbaru (Changelog)
 
-### 📌 Versi 1.3.5 (Terbaru)
+### 📌 Versi 1.3.6 (Terbaru)
+* **Penambahan Menu & Alat Bantu: 🛠️ Koreksi Tanggal Records:**
+  * Menyediakan jendela interaktif 1-klik di Google Sheets (`🚀 Stockbit Tools` > `🛠️ Koreksi Tanggal Records`) untuk memeriksa dan memperbaiki tanggal data transaksi yang terlanjur salah tercatat di sheet `movers_records` dan `screener_records`:
+    * **Tombol Cepat 1-Klik:** Langsung mengubah data tanggal 21 Nov (Sabtu) menjadi 20 Nov (Jumat), atau 20 Nov menjadi 19 Nov (Kamis).
+    * **Koreksi Tanggal Kustom:** Memungkinkan pengguna memasukkan tanggal lama dan tanggal baru yang diinginkan untuk mengoreksi baris tanggal mana pun secara massal.
+    * **Tabel Ringkasan Otomatis:** Menampilkan daftar tanggal yang saat ini tersimpan beserta jumlah barisnya di kedua sheet records.
+    * **Auto-Sync Kolom Hari & Tampilan Kalender:** Kolom "Hari" di `screener_records` otomatis disesuaikan dan tampilan kalender/dashboard langsung ter-update seketika.
+
+### 📌 Versi 1.3.5
 * **Perbaikan Bug Sinkronisasi Data Bursa (Waktu Buka BEI 09.00 WIB & Akhir Pekan):**
   * **Sinkronisasi Otomatis Pra-Pembukaan Bursa (< 09.00 WIB):** Jam bursa saham Indonesia (IDX) resmi dibuka pukul 09.00 WIB. Sebelum jam 09.00 WIB, bursa hari ini belum berjalan sehingga data yang tampil di Stockbit merupakan data penutupan hari bursa sebelumnya:
     * **Rabu sebelum 09.00 WIB** ➔ Otomatis dicatat sebagai data hari **Selasa (H-1)** dengan kolom Hari tertulis **Selasa**.
