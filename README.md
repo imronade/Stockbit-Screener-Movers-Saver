@@ -59,7 +59,18 @@ Ekstensi browser terpadu untuk **Google Chrome**, **Microsoft Edge**, **Brave Br
 
 ## 🔄 Catatan Rilis & Fitur Terbaru (Changelog)
 
-### 📌 Versi 1.3.4 (Terbaru)
+### 📌 Versi 1.3.5 (Terbaru)
+* **Penanganan Sinkronisasi Jam Buka Bursa Efek Indonesia (09.00 WIB):**
+  * **Sinkronisasi Otomatis Pra-Pembukaan Bursa (< 09.00 WIB):** Jam perdagangan saham di Bursa Efek Indonesia (IDX) resmi dibuka pukul 09.00 WIB. Sebelum pukul 09.00 WIB, perdagangan hari ini belum dimulai sehingga data yang tampil di Stockbit merupakan data penutupan hari bursa sebelumnya:
+    * **Rabu sebelum 09.00 WIB** ➔ Otomatis dicatat sebagai data hari **Selasa (H-1)** dengan kolom Hari tertulis **Selasa**.
+    * **Kamis sebelum 09.00 WIB** ➔ Otomatis dicatat sebagai data hari **Rabu (H-1)** dengan kolom Hari tertulis **Rabu**.
+    * **Jumat sebelum 09.00 WIB** ➔ Otomatis dicatat sebagai data hari **Kamis (H-1)** dengan kolom Hari tertulis **Kamis**.
+    * **Selasa sebelum 09.00 WIB** ➔ Otomatis dicatat sebagai data hari **Senin (H-1)** dengan kolom Hari tertulis **Senin**.
+    * **Senin sebelum 09.00 WIB** ➔ Otomatis dicatat sebagai data hari **Jumat minggu lalu (H-3)** dengan kolom Hari tertulis **Jumat**.
+    * **Pukul 09.00 WIB ke atas (Senin – Jumat)** ➔ Dicatat sebagai data transaksi bursa hari ini.
+  * **Sinkronisasi Akhir Pekan (Sabtu & Minggu):** Bursa libur, data otomatis dicatat sebagai data hari **Jumat**.
+
+### 📌 Versi 1.3.4
 * **Penanganan Cerdas Sinkronisasi Akhir Pekan (Sabtu / Minggu ➔ Tanggal Penutupan Jumat):**
   * **Sinkronisasi Otomatis Mengikuti Hari Bursa:** Pada akhir pekan (Sabtu & Minggu), bursa efek Indonesia (IDX) libur dan data yang tampil di Stockbit merupakan data penutupan perdagangan hari Jumat. Ekstensi browser dan Google Apps Script kini otomatis mendeteksi:
     * Jika sync/ekspor dilakukan di hari **Sabtu**, tanggal otomatis ditetapkan ke hari **Jumat (H-1)** dan kolom Hari tertulis **Jumat**.

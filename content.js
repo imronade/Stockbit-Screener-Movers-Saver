@@ -221,31 +221,68 @@
   }
 
   /**
-   * Helper penanggalan data bursa (Market Date):
-   * - Hari Senin s/d Jumat: Menggunakan tanggal hari ini.
-   * - Hari Sabtu: Menggunakan tanggal hari Jumat (H-1) karena bursa libur dan data Stockbit adalah penutupan Jumat.
-   * - Hari Minggu: Menggunakan tanggal hari Jumat (H-2) karena bursa libur dan data Stockbit adalah penutupan Jumat.
+   * Helper penanggalan data bursa (Market Date) berbasis jam buka Bursa Efek Indonesia (09.00 WIB):
+   * - Hari Sabtu & Minggu: Bursa tutup -> data Stockbit adalah penutupan Jumat.
+   * - Hari Senin s/d Jumat SEBELUM jam 09.00 WIB: Bursa hari ini belum buka -> data Stockbit adalah penutupan hari bursa sebelumnya
+   *   (Senin < 09.00 WIB -> Jumat; Selasa s/d Jumat < 09.00 WIB -> hari kemarin H-1).
+   * - Hari Senin s/d Jumat SETELAH jam 09.00 WIB: Bursa aktif/tutup hari ini -> data Stockbit adalah hari ini.
    */
   function getMarketDate() {
-    const now = new Date();
-    const day = now.getDay(); // 0 = Minggu, 1 = Senin, ..., 6 = Sabtu
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Jakarta',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
 
-    const target = new Date(now.getTime());
-    if (day === 6) {
-      // Sabtu -> mundur 1 hari ke Jumat
-      target.setDate(target.getDate() - 1);
-    } else if (day === 0) {
-      // Minggu -> mundur 2 hari ke Jumat
-      target.setDate(target.getDate() - 2);
+    const parts = formatter.formatToParts(new Date());
+    const map = {};
+    for (const p of parts) {
+      map[p.type] = p.value;
     }
 
-    const y = target.getFullYear();
-    const m = String(target.getMonth() + 1).padStart(2, '0');
-    const d = String(target.getDate()).padStart(2, '0');
+    const y = parseInt(map.year, 10);
+    const m = parseInt(map.month, 10);
+    const d = parseInt(map.day, 10);
+    let hour = parseInt(map.hour, 10);
+    if (hour === 24) hour = 0;
+
+    // Patenkan objek Date di jam 12:00 siang WIB untuk hindari pergeseran hari
+    const wibDate = new Date(y, m - 1, d, 12, 0, 0);
+    const dayOfWeek = wibDate.getDay(); // 0 = Minggu, 1 = Senin, ..., 6 = Sabtu
+
+    let targetDate = new Date(wibDate.getTime());
+
+    if (dayOfWeek === 6) {
+      // Sabtu -> data penutupan Jumat (H-1)
+      targetDate.setDate(targetDate.getDate() - 1);
+    } else if (dayOfWeek === 0) {
+      // Minggu -> data penutupan Jumat (H-2)
+      targetDate.setDate(targetDate.getDate() - 2);
+    } else if (hour < 9) {
+      // Senin s/d Jumat SEBELUM jam 09.00 WIB (bursa belum buka):
+      if (dayOfWeek === 1) {
+        // Senin sebelum jam 09.00 WIB -> data Jumat minggu lalu (H-3)
+        targetDate.setDate(targetDate.getDate() - 3);
+      } else {
+        // Selasa s/d Jumat sebelum jam 09.00 WIB -> data kemarin (H-1)
+        targetDate.setDate(targetDate.getDate() - 1);
+      }
+    } else {
+      // Senin s/d Jumat JAM 09.00 WIB ke atas -> data hari ini
+    }
+
+    const resYear = targetDate.getFullYear();
+    const resMonth = String(targetDate.getMonth() + 1).padStart(2, '0');
+    const resDay = String(targetDate.getDate()).padStart(2, '0');
+
     return {
-      ymd: `${y}-${m}-${d}`,
-      dmy: `${d}/${m}/${y}`,
-      compact: `${y}${m}${d}`
+      ymd: `${resYear}-${resMonth}-${resDay}`,
+      dmy: `${resDay}/${resMonth}/${resYear}`,
+      compact: `${resYear}${resMonth}${resDay}`
     };
   }
 

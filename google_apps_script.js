@@ -29,7 +29,7 @@
 // =========================================================================================
 // KONFIGURASI VERSI SCRIPT
 // =========================================================================================
-const SCRIPT_VERSION = "1.3.4";
+const SCRIPT_VERSION = "1.3.5";
 
 /**
  * Menu Kustom di Google Sheets saat file dibuka
@@ -158,14 +158,30 @@ function doPost(e) {
     if (payload.type === "screener" || payload.action === "appendScreener" || payload.screenerName || payload.rows) {
       const screenerName = payload.screenerName || "Stockbit Screener";
 
-      // Jika tanggal tidak dikirim dari payload, hitung tanggal bursa terakhir (Sabtu/Minggu mundur ke Jumat)
+      // Jika tanggal tidak dikirim dari payload, hitung tanggal bursa terakhir berbasis jam buka BEI (09.00 WIB)
       let dateStr = payload.date;
       if (!dateStr) {
         const now = new Date();
-        const day = now.getDay();
-        const target = new Date(now.getTime());
-        if (day === 6) target.setDate(target.getDate() - 1);
-        else if (day === 0) target.setDate(target.getDate() - 2);
+        const hourWIB = parseInt(Utilities.formatDate(now, "Asia/Jakarta", "HH"), 10);
+        const dayWIB = parseInt(Utilities.formatDate(now, "Asia/Jakarta", "u"), 10); // 1 = Senin, ..., 7 = Minggu
+
+        let target = new Date(now.getTime());
+        if (dayWIB === 6) {
+          // Sabtu -> mundur 1 hari ke Jumat
+          target.setDate(target.getDate() - 1);
+        } else if (dayWIB === 7) {
+          // Minggu -> mundur 2 hari ke Jumat
+          target.setDate(target.getDate() - 2);
+        } else if (hourWIB < 9) {
+          // Senin s/d Jumat sebelum jam 09.00 WIB (bursa belum buka):
+          if (dayWIB === 1) {
+            // Senin sebelum 09.00 WIB -> mundur 3 hari ke Jumat
+            target.setDate(target.getDate() - 3);
+          } else {
+            // Selasa s/d Jumat sebelum 09.00 WIB -> mundur 1 hari (kemarin)
+            target.setDate(target.getDate() - 1);
+          }
+        }
         const ssTz = ss.getSpreadsheetTimeZone() || "Asia/Jakarta";
         dateStr = Utilities.formatDate(target, ssTz, "yyyy-MM-dd");
       }
@@ -1742,9 +1758,9 @@ function showUpdateScriptModal() {
           <div class="features-box">
             <div style="font-weight: 700; color: #0f172a; margin-bottom: 6px;">✨ Perbaikan & Pembaruan Terkini (v${currentVer}):</div>
             <ul style="margin: 0; padding-left: 18px; line-height: 1.6;">
-              <li><b>Sinkronisasi Akhir Pekan Cerdas:</b> Jika sync dilakukan di hari Sabtu atau Minggu saat bursa libur, tanggal otomatis ditetapkan ke hari <b>Jumat</b> (penutupan bursa terakhir).</li>
-              <li><b>Pengembalian Zona Waktu ke Semula:</b> Tidak mengubah/memaksa setelan timezone Spreadsheet, parsing tanggal kembali mengikuti konfigurasi asli pengguna.</li>
-              <li><b>Penyelarasan Kalender Bursa (Senin – Jumat):</b> Tanggal awal bulan yang jatuh di tengah minggu (Oktober, Desember, April, dll.) otomatis menarik hari Senin dari bulan sebelumnya dan memasukkan seluruh datanya secara utuh.</li>
+              <li><b>Sinkronisasi Otomatis Jam Buka Bursa (09.00 WIB):</b> Sebelum jam 09.00 WIB bursa hari ini belum buka, sehingga data otomatis dicatat sebagai data penutupan hari bursa sebelumnya (misal: sync Rabu &lt; 09.00 WIB = data Selasa; Senin &lt; 09.00 WIB = data Jumat).</li>
+              <li><b>Sinkronisasi Akhir Pekan (Sabtu & Minggu):</b> Otomatis ditetapkan ke hari <b>Jumat</b> penutupan terakhir.</li>
+              <li><b>Pengembalian Zona Waktu ke Semula:</b> Tidak mengubah setelan timezone Spreadsheet, parsing tanggal kembali mengikuti konfigurasi asli.</li>
               <li><b>Format Simbol Bintang Ringkas:</b> Irisan screener disajikan ringkas (<b>2⭐</b>, <b>3⭐</b>, dst.) hemat tempat & rapi di kolom kalender.</li>
             </ul>
           </div>
