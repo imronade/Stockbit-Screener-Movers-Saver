@@ -59,7 +59,13 @@ Ekstensi browser terpadu untuk **Google Chrome**, **Microsoft Edge**, **Brave Br
 
 ## 🔄 Catatan Rilis & Fitur Terbaru (Changelog)
 
-### 📌 Versi 1.3.6 (Terbaru)
+### 📌 Versi 1.3.7 (Terbaru)
+* **Standardisasi & Penguncian Zona Waktu Otomatis ke Asia/Jakarta (WIB / GMT+07:00):**
+  * Script Google Apps Script kini secara otomatis mengunci setelan zona waktu spreadsheet ke **Asia/Jakarta (WIB)** (`ensureWIBTimeZone`) saat setup awal, sinkronisasi data (`doPost`), maupun refresh tampilan.
+  * Menyelaraskan secara total seluruh alur kerja antara domisili pengguna di WIB, jam perdagangan Bursa Efek Indonesia (09.00 WIB), ekstensi browser, dan spreadsheet Google Sheets.
+  * Seluruh fungsi parsing tanggal (`parseDateToYMD`) dan deteksi nama hari Indonesia (`getIndonesianDay`) diproses secara paten dalam zona waktu Asia/Jakarta.
+
+### 📌 Versi 1.3.6
 * **Penambahan Menu & Alat Bantu: 🛠️ Koreksi Tanggal Records:**
   * Menyediakan jendela interaktif 1-klik di Google Sheets (`🚀 Stockbit Tools` > `🛠️ Koreksi Tanggal Records`) untuk memeriksa dan memperbaiki tanggal data transaksi yang terlanjur salah tercatat di sheet `movers_records` dan `screener_records`:
     * **Tombol Cepat 1-Klik:** Langsung mengubah data tanggal 21 Nov (Sabtu) menjadi 20 Nov (Jumat), atau 20 Nov menjadi 19 Nov (Kamis).

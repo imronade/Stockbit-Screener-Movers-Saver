@@ -2,7 +2,7 @@
  * =========================================================================================
  * STOCKBIT SCREENER & MOVERS SAVER - ALL-IN-ONE GOOGLE APPS SCRIPT
  * =========================================================================================
- * Versi: 1.3.6 (Penambahan Tool Interaktif Koreksi Tanggal Records & Otomasi Jam Bursa BEI)
+ * Versi: 1.3.7 (Enforce Timezone Asia/Jakarta WIB & Smart Market Date Automation)
  * 
  * FITUR UTAMA:
  * 1. Side-by-Side Calendar View (Senin - Jumat):
@@ -29,7 +29,7 @@
 // =========================================================================================
 // KONFIGURASI VERSI SCRIPT
 // =========================================================================================
-const SCRIPT_VERSION = "1.3.6";
+const SCRIPT_VERSION = "1.3.7";
 
 /**
  * Menu Kustom di Google Sheets saat file dibuka
@@ -113,6 +113,7 @@ function doPost(e) {
 
     const payload = JSON.parse(e.postData.contents);
     const ss = SpreadsheetApp.getActiveSpreadsheet();
+    ensureWIBTimeZone(ss);
 
     // -----------------------------------------------------------------------
     // A. JALUR MOVERS
@@ -184,8 +185,7 @@ function doPost(e) {
             target.setDate(target.getDate() - 1);
           }
         }
-        const ssTz = ss.getSpreadsheetTimeZone() || "Asia/Jakarta";
-        dateStr = Utilities.formatDate(target, ssTz, "yyyy-MM-dd");
+        dateStr = Utilities.formatDate(target, "Asia/Jakarta", "yyyy-MM-dd");
       }
       const dayStr = getIndonesianDay(dateStr);
       const rows = payload.rows || [];
@@ -324,21 +324,30 @@ function safeToast(msg, title = "Info", timeout = 3) {
   } catch (_) {}
 }
 
+/**
+ * Memastikan Spreadsheet selalu terkunci pada zona waktu resmi Asia/Jakarta (WIB / UTC+7)
+ */
+function ensureWIBTimeZone(ss) {
+  try {
+    if (!ss) ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (ss && ss.getSpreadsheetTimeZone() !== "Asia/Jakarta") {
+      ss.setSpreadsheetTimeZone("Asia/Jakarta");
+    }
+  } catch (_) {}
+}
+
 function parseDateToYMD(val) {
   if (!val) return "";
   if (val instanceof Date) {
     if (isNaN(val.getTime())) return "";
-    // Menambahkan 12 jam (tengah hari) sebelum format agar aman dari pergeseran hari
-    // akibat perbedaan offset zona waktu (misal WITA UTC+8 / WIB UTC+7 / UTC)
+    // Menambahkan 12 jam (tengah hari) dan format paten menggunakan zona waktu Asia/Jakarta (WIB / UTC+7)
     const safeDate = new Date(val.getTime() + (12 * 3600 * 1000));
-    const ssTz = SpreadsheetApp.getActiveSpreadsheet() ? SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone() : "Asia/Jakarta";
-    return Utilities.formatDate(safeDate, ssTz || "Asia/Jakarta", "yyyy-MM-dd");
+    return Utilities.formatDate(safeDate, "Asia/Jakarta", "yyyy-MM-dd");
   }
   if (typeof val === "number") {
     const epoch = new Date(1899, 11, 30, 12, 0, 0);
     const d = new Date(epoch.getTime() + val * 86400000);
-    const ssTz = SpreadsheetApp.getActiveSpreadsheet() ? SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone() : "Asia/Jakarta";
-    return Utilities.formatDate(d, ssTz || "Asia/Jakarta", "yyyy-MM-dd");
+    return Utilities.formatDate(d, "Asia/Jakarta", "yyyy-MM-dd");
   }
   const s = String(val).trim();
   if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
@@ -369,10 +378,12 @@ function formatDateYMD(d) {
 function getIndonesianDay(dateVal) {
   const days = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
   if (!dateVal) {
-    return days[new Date().getDay()];
+    const dayNum = parseInt(Utilities.formatDate(new Date(), "Asia/Jakarta", "u"), 10);
+    return days[dayNum % 7];
   }
   if (dateVal instanceof Date) {
-    return days[dateVal.getDay()];
+    const dayNum = parseInt(Utilities.formatDate(dateVal, "Asia/Jakarta", "u"), 10);
+    return days[dayNum % 7];
   }
   const ymd = parseDateToYMD(dateVal);
   if (ymd) {
@@ -407,7 +418,9 @@ function getMonthNamesList() {
 }
 
 function parseMonthIndex(monthStr) {
-  if (!monthStr) return new Date().getMonth() + 1;
+  if (!monthStr) {
+    return parseInt(Utilities.formatDate(new Date(), "Asia/Jakarta", "M"), 10);
+  }
   const s = String(monthStr).trim().toLowerCase();
 
   // 1. Cek angka dalam kurung, misal "November (11)"
@@ -437,7 +450,7 @@ function parseMonthIndex(monthStr) {
     if (s.startsWith(name)) return idx;
   }
 
-  return new Date().getMonth() + 1;
+  return parseInt(Utilities.formatDate(new Date(), "Asia/Jakarta", "M"), 10);
 }
 
 // =========================================================================================
@@ -445,6 +458,7 @@ function parseMonthIndex(monthStr) {
 // =========================================================================================
 function setupTemplateViews() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+  ensureWIBTimeZone(ss);
 
   // 1. Sheet: panduan_penggunaan
   setupGuideSheetStructure();
@@ -566,13 +580,15 @@ function reorderAllSheets() {
 // =========================================================================================
 function setupCalendarSheetStructure() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+  ensureWIBTimeZone(ss);
   let wsCal = getSheetCaseInsensitive(ss, "calendar_view");
   if (!wsCal) wsCal = ss.insertSheet("calendar_view", 0);
 
   // Pertahankan filter dan checklist yang sudah dipilih user sebelumnya (jika ada)
-  let curYear = String(new Date().getFullYear());
+  let curYear = Utilities.formatDate(new Date(), "Asia/Jakarta", "yyyy");
   const monthNames = getMonthNamesList();
-  let curMonth = monthNames[new Date().getMonth()];
+  const curMonthIdx = parseInt(Utilities.formatDate(new Date(), "Asia/Jakarta", "M"), 10) - 1;
+  let curMonth = monthNames[curMonthIdx];
   let curCategory = "SEMUA KATEGORI";
   let curChecksRow1 = [true, false, false, false, false];
   let curChecksRow2 = [false, false];
@@ -1592,6 +1608,8 @@ function updateCategoryDropdown() {
 // 6. REFRESH SEMUA VIEW & DATA
 // =========================================================================
 function updateAllViews() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  ensureWIBTimeZone(ss);
   renderUnifiedCalendarView();
   renderMoversDashboard();
   renderScreenerDashboard();
@@ -1883,6 +1901,8 @@ function showUpdateScriptModal() {
  * sheet 'movers_records' dan 'screener_records' secara 1-klik.
  */
 function showFixRecordsDateModal() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  ensureWIBTimeZone(ss);
   const ui = SpreadsheetApp.getUi();
   const summary = getRecordsDateSummary();
 
