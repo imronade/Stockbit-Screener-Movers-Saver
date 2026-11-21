@@ -2,7 +2,7 @@
  * =========================================================================================
  * STOCKBIT SCREENER & MOVERS SAVER - ALL-IN-ONE GOOGLE APPS SCRIPT
  * =========================================================================================
- * Versi: 1.3.3 (Enforce UTC+7 / WIB Asia/Jakarta on Extension & Spreadsheet)
+ * Versi: 1.3.5 (Perbaikan Bug Sinkronisasi Jam Bursa BEI 09.00 WIB, Akhir Pekan & Normalisasi Zona Waktu)
  * 
  * FITUR UTAMA:
  * 1. Side-by-Side Calendar View (Senin - Jumat):
