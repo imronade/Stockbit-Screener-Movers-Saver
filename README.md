@@ -59,7 +59,17 @@ Ekstensi browser terpadu untuk **Google Chrome**, **Microsoft Edge**, **Brave Br
 
 ## 🔄 Catatan Rilis & Fitur Terbaru (Changelog)
 
-### 📌 Versi 1.3.7 (Terbaru)
+### 📌 Versi 1.3.8 (Terbaru)
+* **Format Nilai Negatif Parentheses `(...)` pada Kolom Net Foreign untuk Kategori Net Foreign Sell:**
+  * Pada kategori **Net Foreign Sell** di fitur Movers, nilai pada kolom *Net Foreign* kini secara baku otomatis dibungkus tanda kurung `(...)` untuk merepresentasikan angka negatif / arus jual asing (contoh: nilai `100` ditulis menjadi **`(100)`**, `15.2 B` ditulis menjadi **`(15.2 B)`**).
+  * Berlaku menyeluruh saat scraping di ekstensi browser (`content.js`), ekspor file Excel lokal, penerimaan data webhook Google Apps Script (`doPost`), serta otomatis menormalisasi data riwayat lama di sheet `movers_records` via `formatExistingNetForeignSellParentheses`.
+* **Tabel Irisan Ketiga (Movers & Screener) di Bagian Bawah Calendar View:**
+  * Menghadirkan tabel irisan terpadu otomatis yang diletakkan persis di bawah kalender 6 minggu pada sheet `calendar_view`:
+    * **Bagian 1: 🔥 IRISAN HARI SAMA (SAME-DAY CONFLUENCE):** Menyaring saham yang pada hari bursa yang sama lolos filter kategori Movers (Kiri) SEKALIGUS lolos Screener (Kanan). Dilengkapi dengan nomor urut, kode emiten, total hari kemunculan (dengan indikator stabilo hijau `🟢` untuk $\ge 2$ hari), daftar tanggal kemunculan bursa, kategori Movers yang terpenuhi, serta screener dan bintang `⭐`.
+    * **Bagian 2: 📅 IRISAN PERIODE BULAN (HARI BERBEDA):** Menyajikan saham-saham yang aktif di Movers dan Screener pada bulan yang sama namun di tanggal bursa yang berbeda untuk melengkapi analisis momentum bulanan.
+    * **Ultra-Cepat & Auto-Update:** Menggunakan metode batching `mergeAcross` dan sinkron otomatis terhadap perubahan filter checkbox Movers, dropdown Screener, maupun pilihan Bulan/Tahun.
+
+### 📌 Versi 1.3.7
 * **Standardisasi & Penguncian Zona Waktu Otomatis ke Asia/Jakarta (WIB / GMT+07:00):**
   * Script Google Apps Script kini secara otomatis mengunci setelan zona waktu spreadsheet ke **Asia/Jakarta (WIB)** (`ensureWIBTimeZone`) saat setup awal, sinkronisasi data (`doPost`), maupun refresh tampilan.
   * Menyelaraskan secara total seluruh alur kerja antara domisili pengguna di WIB, jam perdagangan Bursa Efek Indonesia (09.00 WIB), ekstensi browser, dan spreadsheet Google Sheets.

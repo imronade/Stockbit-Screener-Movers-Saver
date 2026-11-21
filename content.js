@@ -785,6 +785,14 @@
             value = kmbTokens[1];
             volume = kmbTokens[2];
           }
+
+          // Format kolom Net Foreign pada kategori Net Foreign Sell dengan tanda kurung () untuk menandakan nilai negatif/jualan
+          if (activeTab === 'Net Foreign Sell' && netForeign && netForeign !== '-') {
+            const cleanVal = netForeign.replace(/^[-\s()]+|[()\s]+$/g, '').trim();
+            if (cleanVal) {
+              netForeign = `(${cleanVal})`;
+            }
+          }
         }
 
         const hasValidData = price !== '-' || value !== '-' || volume !== '-' || idxPoints !== '-' || idxMov !== '-';

@@ -29,7 +29,7 @@
 // =========================================================================================
 // KONFIGURASI VERSI SCRIPT
 // =========================================================================================
-const SCRIPT_VERSION = "1.3.7";
+const SCRIPT_VERSION = "1.3.8";
 
 /**
  * Menu Kustom di Google Sheets saat file dibuka
@@ -60,21 +60,23 @@ function onEdit(e) {
 
     // 1. Edit di sheet 'calendar_view'
     if (sheetName === "calendar_view") {
-      // Edit Tahun (E3) atau Bulan (H3) di posisi Center -> Refresh KEDUA kalender
+      // Edit Tahun (E3) atau Bulan (H3) di posisi Center -> Refresh KEDUA kalender & Tabel Irisan Bersama
       if (row === 3 && (col === 5 || col === 8)) {
         renderUnifiedCalendarView();
         return;
       }
-      // Edit Kategori Screener (G6 atau H6) -> Refresh Kalender Screener
+      // Edit Kategori Screener (G6 atau H6) -> Refresh Kalender Screener & Tabel Irisan Bersama
       if (row === 6 && (col === 7 || col === 8)) {
-        renderScreenerCalendarPart();
+        const screenerData = renderScreenerCalendarPart();
+        renderMoversScreenerIntersectionTable(null, screenerData);
         return;
       }
       // Edit Checkbox Movers:
       // Baris 6 (Kolom A s/d E: Top Gainer, Loser, Value, Volume, Freq)
       // Baris 8 (Kolom A s/d B: Net Foreign Buy, Net Foreign Sell)
       if ((row === 6 && col >= 1 && col <= 5) || (row === 8 && col >= 1 && col <= 2)) {
-        renderMoversCalendarPart();
+        const moversData = renderMoversCalendarPart();
+        renderMoversScreenerIntersectionTable(moversData, null);
         return;
       }
     }
@@ -137,16 +139,27 @@ function doPost(e) {
         wsMovers.setFrozenRows(1);
       }
 
-      const rows = records.map(r => [
-        r.tanggal, r.kategori, r.symbol, r.price, r.idxPoints, r.idxMov, r.value, r.volume, r.freq, r.netForeign
-      ]);
+      const rows = records.map(r => {
+        let netForeignVal = r.netForeign;
+        const kat = String(r.kategori || "").trim().toLowerCase();
+        if (kat === "net foreign sell" && netForeignVal && netForeignVal !== "-") {
+          const cleanVal = String(netForeignVal).replace(/^[-\s()]+|[()\s]+$/g, '').trim();
+          if (cleanVal) {
+            netForeignVal = `(${cleanVal})`;
+          }
+        }
+        return [
+          r.tanggal, r.kategori, r.symbol, r.price, r.idxPoints, r.idxMov, r.value, r.volume, r.freq, netForeignVal
+        ];
+      });
 
       const lastRow = wsMovers.getLastRow();
       wsMovers.getRange(lastRow + 1, 1, rows.length, rows[0].length).setValues(rows);
 
-      // Refresh tampilan Movers
+      // Refresh tampilan Movers & Tabel Irisan Bersama
       renderMoversCalendarPart();
       renderMoversDashboard();
+      renderMoversScreenerIntersectionTable();
 
       return ContentService.createTextOutput(JSON.stringify({
         status: "success",
@@ -276,9 +289,10 @@ function doPost(e) {
         wsScreener.getRange(lastRow + 1, 1, appendRows.length, currentHeaders.length).setValues(appendRows);
       }
 
-      // Refresh tampilan Screener
+      // Refresh tampilan Screener & Tabel Irisan Bersama
       renderScreenerCalendarPart();
       renderScreenerDashboard();
+      renderMoversScreenerIntersectionTable();
 
       return ContentService.createTextOutput(JSON.stringify({
         status: "success",
@@ -521,6 +535,9 @@ function setupTemplateViews() {
 
   // Susun urutan tab sheet sesuai urutan baku
   reorderAllSheets();
+
+  // Format historical Net Foreign Sell dengan tanda kurung ()
+  formatExistingNetForeignSellParentheses();
 
   // Render konten awal
   renderUnifiedCalendarView();
@@ -768,32 +785,73 @@ function setupCalendarSheetStructure() {
     wsCal.setRowHeight(rContent, 65);
     wsCal.getRange("F" + rDate + ":F" + rContent).setBackground("#f8fafc");
   }
+
+  // Row 22: Spacer pembatas sebelum Tabel Irisan Ketiga
+  wsCal.getRange("A22:K22").clear().setBackground("#f8fafc");
+  wsCal.setRowHeight(22, 14);
+
+  // Bersihkan area baris 23 ke bawah agar siap dirender tabel irisan
+  const maxCalRow = wsCal.getMaxRows();
+  if (maxCalRow >= 23) {
+    wsCal.getRange(23, 1, maxCalRow - 22, 11).clear();
+  }
 }
 
 /**
- * Render KEDUA sisi kalender (Movers & Screener)
+ * Format nama kategori Movers agar rapi saat ditampilkan di tabel
  */
-function renderUnifiedCalendarView() {
-  renderMoversCalendarPart();
-  renderScreenerCalendarPart();
+function formatCategoryDisplayName(cat) {
+  if (!cat) return "";
+  const catLower = String(cat).trim().toLowerCase();
+  const map = {
+    "top gainer": "Top Gainer",
+    "top loser": "Top Loser",
+    "top value": "Top Value",
+    "top volume": "Top Volume",
+    "top frequency": "Top Frequency",
+    "top freq": "Top Frequency",
+    "net foreign buy": "Net Foreign Buy",
+    "net foreign sell": "Net Foreign Sell"
+  };
+  return map[catLower] || cat;
 }
 
 /**
- * Render Sisi Kiri: Movers Calendar
+ * Memastikan nilai pada kolom 'Net Foreign' di sheet 'movers_records'
+ * untuk kategori 'Net Foreign Sell' diformat dengan tanda kurung (...) sebagai indikator negatif/jualan.
  */
-function renderMoversCalendarPart() {
+function formatExistingNetForeignSellParentheses() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let wsCal = getSheetCaseInsensitive(ss, "calendar_view");
   const wsMovers = getSheetCaseInsensitive(ss, "movers_records");
-  if (!wsCal || !wsMovers) return;
+  if (!wsMovers || wsMovers.getLastRow() <= 1) return;
 
-  // Cek apakah struktur calendar_view sudah memiliki 7 kategori (A7 = 'Net Foreign Buy')
-  const a7Val = String(wsCal.getRange("A7").getValue() || "").trim();
-  if (a7Val !== "Net Foreign Buy") {
-    setupCalendarSheetStructure();
-    wsCal = getSheetCaseInsensitive(ss, "calendar_view");
+  const lastRow = wsMovers.getLastRow();
+  // Ambil kolom Kategori (kolom 2) sampai Net Foreign (kolom 10)
+  const range = wsMovers.getRange(2, 2, lastRow - 1, 9);
+  const data = range.getValues();
+  let changed = false;
+
+  for (let i = 0; i < data.length; i++) {
+    const kat = String(data[i][0] || "").trim().toLowerCase();
+    let nf = String(data[i][8] || "").trim();
+    if (kat === "net foreign sell" && nf && nf !== "-" && !nf.startsWith("(")) {
+      const cleanVal = nf.replace(/^[-\s()]+|[()\s]+$/g, '').trim();
+      if (cleanVal) {
+        data[i][8] = `(${cleanVal})`;
+        changed = true;
+      }
+    }
   }
 
+  if (changed) {
+    range.setValues(data);
+  }
+}
+
+/**
+ * Mengambil & memproses data Movers untuk Kalender & Tabel Irisan
+ */
+function getMoversProcessedData(wsCal, wsMovers) {
   const year = parseInt(wsCal.getRange("E3").getValue()) || new Date().getFullYear();
   const monthStr = String(wsCal.getRange("H3").getValue());
   const month = parseMonthIndex(monthStr);
@@ -816,74 +874,22 @@ function renderMoversCalendarPart() {
     }
   }
 
-  const colsMovers = ["A", "B", "C", "D", "E"];
-
-  // Jika tidak ada kategori yang dicentang, kosongkan grid Movers
-  if (activeCategories.size === 0) {
-    for (let w = 0; w < 6; w++) {
-      const rContent = 10 + (w * 2) + 1;
-      for (let c = 0; c < 5; c++) {
-        wsCal.getRange(colsMovers[c] + rContent).setValue("").setBackground("#ffffff");
-      }
-    }
-    return;
-  }
-
-  // Baca data Movers
-  const lastRow = wsMovers.getLastRow();
-  const data = lastRow > 1 ? wsMovers.getRange(2, 1, lastRow - 1, 3).getValues() : [];
-
-  const dateEmitenCatMap = new Map();
-  for (const row of data) {
-    const dateYMD = parseDateToYMD(row[0]);
-    const cat = String(row[1] || "").trim().toLowerCase();
-    const emiten = String(row[2] || "").trim();
-
-    if (!dateYMD || !emiten) continue;
-
-    if (activeCategories.has(cat)) {
-      if (!dateEmitenCatMap.has(dateYMD)) dateEmitenCatMap.set(dateYMD, new Map());
-      const emMap = dateEmitenCatMap.get(dateYMD);
-      if (!emMap.has(emiten)) emMap.set(emiten, new Set());
-      emMap.get(emiten).add(cat);
-    }
-  }
-
-  // Logika Irisan Penuh: emiten harus masuk ke seluruh kategori yang dicentang
-  const requiredCount = activeCategories.size;
-  const dateFinalEmitenMap = new Map();
-  for (const [dateYMD, emMap] of dateEmitenCatMap.entries()) {
-    const validList = [];
-    for (const [sym, catsSet] of emMap.entries()) {
-      if (catsSet.size === requiredCount) {
-        validList.push(sym);
-      }
-    }
-    if (validList.length > 0) {
-      dateFinalEmitenMap.set(dateYMD, validList.sort());
-    }
-  }
-
-  // Hitung Hari Senin Pertama & Batas Akhir Bulan (Gunakan jam 12:00 tengah hari agar bebas geseran timezone)
+  // Hitung Hari Senin Pertama & Batas Akhir Bulan
   const firstDayOfMonth = new Date(year, month - 1, 1, 12, 0, 0);
   const lastDayOfMonth = new Date(year, month, 0, 12, 0, 0);
-  const dayOfWeek = firstDayOfMonth.getDay(); // 0 = Minggu, 1 = Senin, ..., 6 = Sabtu
+  const dayOfWeek = firstDayOfMonth.getDay();
 
   let startMonday;
   if (dayOfWeek === 1) {
     startMonday = new Date(year, month - 1, 1, 12, 0, 0);
   } else if (dayOfWeek === 0) {
-    // Tanggal 1 adalah Minggu -> hari Senin perdagangan pertama adalah tanggal 2
     startMonday = new Date(year, month - 1, 2, 12, 0, 0);
   } else if (dayOfWeek === 6) {
-    // Tanggal 1 adalah Sabtu -> hari Senin perdagangan pertama adalah tanggal 3
     startMonday = new Date(year, month - 1, 3, 12, 0, 0);
   } else {
-    // Tanggal 1 adalah Selasa s/d Jumat (dayOfWeek 2..5) -> mundur ke hari Senin pada minggu tsb (misal 30 Nov untuk Des)
     startMonday = new Date(year, month - 1, 1 - (dayOfWeek - 1), 12, 0, 0);
   }
 
-  // Kumpulkan daftar tanggal yang aktif ditampilkan di kalender untuk hitung frekuensi kemunculan
   const displayedDates = new Set();
   for (let w = 0; w < 6; w++) {
     const weekMonday = new Date(startMonday.getTime() + (w * 7 * 86400000));
@@ -897,7 +903,41 @@ function renderMoversCalendarPart() {
     }
   }
 
-  // Hitung Frekuensi Kemunculan per Emiten pada Minggu-Minggu Kalender yang Tampil
+  const lastRow = wsMovers ? wsMovers.getLastRow() : 0;
+  const data = lastRow > 1 ? wsMovers.getRange(2, 1, lastRow - 1, 3).getValues() : [];
+
+  const dateEmitenCatMap = new Map();
+  for (const row of data) {
+    const dateYMD = parseDateToYMD(row[0]);
+    const cat = String(row[1] || "").trim().toLowerCase();
+    const emiten = String(row[2] || "").trim().toUpperCase();
+
+    if (!dateYMD || !emiten) continue;
+
+    if (activeCategories.has(cat)) {
+      if (!dateEmitenCatMap.has(dateYMD)) dateEmitenCatMap.set(dateYMD, new Map());
+      const emMap = dateEmitenCatMap.get(dateYMD);
+      if (!emMap.has(emiten)) emMap.set(emiten, new Set());
+      emMap.get(emiten).add(cat);
+    }
+  }
+
+  const requiredCount = activeCategories.size;
+  const dateFinalEmitenMap = new Map();
+  if (requiredCount > 0) {
+    for (const [dateYMD, emMap] of dateEmitenCatMap.entries()) {
+      const validList = [];
+      for (const [sym, catsSet] of emMap.entries()) {
+        if (catsSet.size === requiredCount) {
+          validList.push(sym);
+        }
+      }
+      if (validList.length > 0) {
+        dateFinalEmitenMap.set(dateYMD, validList.sort());
+      }
+    }
+  }
+
   const emitenFreqMap = new Map();
   for (const dateYMD of displayedDates) {
     if (dateFinalEmitenMap.has(dateYMD)) {
@@ -905,6 +945,201 @@ function renderMoversCalendarPart() {
         emitenFreqMap.set(sym, (emitenFreqMap.get(sym) || 0) + 1);
       }
     }
+  }
+
+  return {
+    year,
+    month,
+    activeCategories,
+    dateEmitenCatMap,
+    dateFinalEmitenMap,
+    displayedDates,
+    emitenFreqMap,
+    startMonday,
+    lastDayOfMonth
+  };
+}
+
+/**
+ * Mengambil & memproses data Screener untuk Kalender & Tabel Irisan
+ */
+function getScreenerProcessedData(wsCal, wsScreener) {
+  const year = parseInt(wsCal.getRange("E3").getValue()) || new Date().getFullYear();
+  const monthStr = String(wsCal.getRange("H3").getValue());
+  const month = parseMonthIndex(monthStr);
+  const selectedCat = String(wsCal.getRange("G6").getValue() || "SEMUA KATEGORI").trim();
+
+  const firstDayOfMonth = new Date(year, month - 1, 1, 12, 0, 0);
+  const lastDayOfMonth = new Date(year, month, 0, 12, 0, 0);
+  const dayOfWeek = firstDayOfMonth.getDay();
+
+  let startMonday;
+  if (dayOfWeek === 1) {
+    startMonday = new Date(year, month - 1, 1, 12, 0, 0);
+  } else if (dayOfWeek === 0) {
+    startMonday = new Date(year, month - 1, 2, 12, 0, 0);
+  } else if (dayOfWeek === 6) {
+    startMonday = new Date(year, month - 1, 3, 12, 0, 0);
+  } else {
+    startMonday = new Date(year, month - 1, 1 - (dayOfWeek - 1), 12, 0, 0);
+  }
+
+  const displayedDates = new Set();
+  for (let w = 0; w < 6; w++) {
+    const weekMonday = new Date(startMonday.getTime() + (w * 7 * 86400000));
+    weekMonday.setHours(12, 0, 0, 0);
+    if (weekMonday <= lastDayOfMonth) {
+      for (let c = 0; c < 5; c++) {
+        const curDate = new Date(weekMonday.getTime() + (c * 86400000));
+        curDate.setHours(12, 0, 0, 0);
+        displayedDates.add(formatDateYMD(curDate));
+      }
+    }
+  }
+
+  const lastRow = wsScreener ? wsScreener.getLastRow() : 0;
+  const lastCol = wsScreener ? Math.max(wsScreener.getLastColumn(), 7) : 7;
+  const data = lastRow > 1 ? wsScreener.getRange(2, 1, lastRow - 1, lastCol).getValues() : [];
+
+  let colDate = 1;
+  let colScreener = 3;
+  let colCat = 4;
+  let colEmiten = 5;
+
+  if (lastRow > 0) {
+    const headers = wsScreener.getRange(1, 1, 1, lastCol).getValues()[0].map(h => String(h || "").trim().toLowerCase());
+    const idxDate = headers.indexOf("tanggal");
+    if (idxDate !== -1) colDate = idxDate;
+
+    let idxScr = headers.indexOf("nama screener");
+    if (idxScr === -1) idxScr = headers.indexOf("screener");
+    if (idxScr !== -1) colScreener = idxScr;
+
+    const idxCat = headers.indexOf("kategori");
+    if (idxCat !== -1) colCat = idxCat;
+
+    let idxEm = headers.indexOf("emiten");
+    if (idxEm === -1) idxEm = headers.indexOf("symbol");
+    if (idxEm === -1) idxEm = headers.indexOf("saham");
+    if (idxEm !== -1) colEmiten = idxEm;
+  }
+
+  const dateDailyScreeners = new Map();
+  const dateDailyCategories = new Map();
+
+  for (const row of data) {
+    const rDate = parseDateToYMD(row[colDate]);
+    const rScreener = String(row[colScreener] || "").trim();
+    const rCat = String(row[colCat] || "Lainnya").trim();
+    const rEmiten = String(row[colEmiten] || "").trim().toUpperCase();
+
+    if (!rDate || !rEmiten) continue;
+
+    if (!dateDailyScreeners.has(rDate)) dateDailyScreeners.set(rDate, new Map());
+    const scrMap = dateDailyScreeners.get(rDate);
+    if (!scrMap.has(rEmiten)) scrMap.set(rEmiten, new Set());
+    if (rScreener) scrMap.get(rEmiten).add(rScreener);
+
+    if (!dateDailyCategories.has(rDate)) dateDailyCategories.set(rDate, new Map());
+    const catMap = dateDailyCategories.get(rDate);
+    if (!catMap.has(rEmiten)) catMap.set(rEmiten, new Set());
+    if (rCat) catMap.get(rEmiten).add(rCat.toLowerCase());
+  }
+
+  const isOnlyIrisan = selectedCat.toUpperCase().includes("IRISAN") || selectedCat.includes("≥ 2") || selectedCat.includes(">= 2");
+  const isAllCategories = selectedCat === "SEMUA KATEGORI" || selectedCat === "SEMUA" || !selectedCat;
+
+  const dateDisplayMap = new Map();
+  for (const [dateYMD, emMap] of dateDailyScreeners.entries()) {
+    const validEmitens = [];
+    for (const [sym, screenerSet] of emMap.entries()) {
+      if (isOnlyIrisan) {
+        if (screenerSet.size >= 2) validEmitens.push(sym);
+      } else if (isAllCategories) {
+        validEmitens.push(sym);
+      } else {
+        const catSet = dateDailyCategories.get(dateYMD)?.get(sym);
+        if (catSet && catSet.has(selectedCat.toLowerCase())) {
+          validEmitens.push(sym);
+        }
+      }
+    }
+    if (validEmitens.length > 0) {
+      dateDisplayMap.set(dateYMD, validEmitens.sort());
+    }
+  }
+
+  const emitenFreqMap = new Map();
+  for (const dateYMD of displayedDates) {
+    if (dateDisplayMap.has(dateYMD)) {
+      for (const sym of dateDisplayMap.get(dateYMD)) {
+        emitenFreqMap.set(sym, (emitenFreqMap.get(sym) || 0) + 1);
+      }
+    }
+  }
+
+  return {
+    year,
+    month,
+    selectedCat,
+    dateDailyScreeners,
+    dateDailyCategories,
+    dateDisplayMap,
+    displayedDates,
+    emitenFreqMap,
+    startMonday,
+    lastDayOfMonth
+  };
+}
+
+/**
+ * Render KEDUA sisi kalender (Movers & Screener) serta Tabel Irisan Ketiga di bawahnya
+ */
+function renderUnifiedCalendarView() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  ensureWIBTimeZone(ss);
+  const moversData = renderMoversCalendarPart();
+  const screenerData = renderScreenerCalendarPart();
+  renderMoversScreenerIntersectionTable(moversData, screenerData);
+}
+
+/**
+ * Render Sisi Kiri: Movers Calendar
+ */
+function renderMoversCalendarPart() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let wsCal = getSheetCaseInsensitive(ss, "calendar_view");
+  const wsMovers = getSheetCaseInsensitive(ss, "movers_records");
+  if (!wsCal || !wsMovers) return null;
+
+  // Cek apakah struktur calendar_view sudah memiliki 7 kategori (A7 = 'Net Foreign Buy')
+  const a7Val = String(wsCal.getRange("A7").getValue() || "").trim();
+  if (a7Val !== "Net Foreign Buy") {
+    setupCalendarSheetStructure();
+    wsCal = getSheetCaseInsensitive(ss, "calendar_view");
+  }
+
+  const data = getMoversProcessedData(wsCal, wsMovers);
+  const {
+    activeCategories,
+    dateFinalEmitenMap,
+    displayedDates,
+    emitenFreqMap,
+    startMonday,
+    lastDayOfMonth
+  } = data;
+
+  const colsMovers = ["A", "B", "C", "D", "E"];
+
+  // Jika tidak ada kategori yang dicentang, kosongkan grid Movers
+  if (activeCategories.size === 0) {
+    for (let w = 0; w < 6; w++) {
+      const rContent = 10 + (w * 2) + 1;
+      for (let c = 0; c < 5; c++) {
+        wsCal.getRange(colsMovers[c] + rContent).setValue("").setBackground("#ffffff");
+      }
+    }
+    return data;
   }
 
   // Text Style untuk Emiten Berulang (Stabilo Hijau Tebal) & Normal
@@ -996,6 +1231,8 @@ function renderMoversCalendarPart() {
       }
     }
   }
+
+  return data;
 }
 
 /**
@@ -1005,7 +1242,7 @@ function renderScreenerCalendarPart() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let wsCal = getSheetCaseInsensitive(ss, "calendar_view");
   const wsScreener = getSheetCaseInsensitive(ss, "screener_records");
-  if (!wsCal || !wsScreener) return;
+  if (!wsCal || !wsScreener) return null;
 
   // Cek apakah struktur calendar_view sudah memiliki 7 kategori (A7 = 'Net Foreign Buy')
   const a7Val = String(wsCal.getRange("A7").getValue() || "").trim();
@@ -1014,136 +1251,15 @@ function renderScreenerCalendarPart() {
     wsCal = getSheetCaseInsensitive(ss, "calendar_view");
   }
 
-  const year = parseInt(wsCal.getRange("E3").getValue()) || new Date().getFullYear();
-  const monthStr = String(wsCal.getRange("H3").getValue());
-  const month = parseMonthIndex(monthStr);
-  const selectedCat = String(wsCal.getRange("G6").getValue() || "SEMUA KATEGORI").trim();
-
-  // Baca data Screener dengan deteksi kolom dinamis
-  const lastRow = wsScreener.getLastRow();
-  const lastCol = Math.max(wsScreener.getLastColumn(), 7);
-  const data = lastRow > 1 ? wsScreener.getRange(2, 1, lastRow - 1, lastCol).getValues() : [];
-
-  let colDate = 1;
-  let colScreener = 3;
-  let colCat = 4;
-  let colEmiten = 5;
-
-  if (lastRow > 0) {
-    const headers = wsScreener.getRange(1, 1, 1, lastCol).getValues()[0].map(h => String(h || "").trim().toLowerCase());
-    const idxDate = headers.indexOf("tanggal");
-    if (idxDate !== -1) colDate = idxDate;
-
-    let idxScr = headers.indexOf("nama screener");
-    if (idxScr === -1) idxScr = headers.indexOf("screener");
-    if (idxScr !== -1) colScreener = idxScr;
-
-    const idxCat = headers.indexOf("kategori");
-    if (idxCat !== -1) colCat = idxCat;
-
-    let idxEm = headers.indexOf("emiten");
-    if (idxEm === -1) idxEm = headers.indexOf("symbol");
-    if (idxEm === -1) idxEm = headers.indexOf("saham");
-    if (idxEm !== -1) colEmiten = idxEm;
-  }
-
-  // 1. Kumpulkan semua screener unik & kategori per emiten per tanggal secara global
-  // dateDailyScreeners: Map<dateYMD, Map<emiten, Set<screenerName>>>
-  const dateDailyScreeners = new Map();
-  // dateDailyCategories: Map<dateYMD, Map<emiten, Set<categoryLower>>>
-  const dateDailyCategories = new Map();
-
-  for (const row of data) {
-    const rDate = parseDateToYMD(row[colDate]);
-    const rScreener = String(row[colScreener] || "").trim();
-    const rCat = String(row[colCat] || "Lainnya").trim();
-    const rEmiten = String(row[colEmiten] || "").trim().toUpperCase();
-
-    if (!rDate || !rEmiten) continue;
-
-    if (!dateDailyScreeners.has(rDate)) dateDailyScreeners.set(rDate, new Map());
-    const scrMap = dateDailyScreeners.get(rDate);
-    if (!scrMap.has(rEmiten)) scrMap.set(rEmiten, new Set());
-    if (rScreener) scrMap.get(rEmiten).add(rScreener);
-
-    if (!dateDailyCategories.has(rDate)) dateDailyCategories.set(rDate, new Map());
-    const catMap = dateDailyCategories.get(rDate);
-    if (!catMap.has(rEmiten)) catMap.set(rEmiten, new Set());
-    if (rCat) catMap.get(rEmiten).add(rCat.toLowerCase());
-  }
-
-  // 2. Filter emiten yang ditampilkan berdasarkan pilihan dropdown G6
-  const isOnlyIrisan = selectedCat.toUpperCase().includes("IRISAN") || selectedCat.includes("≥ 2") || selectedCat.includes(">= 2");
-  const isAllCategories = selectedCat === "SEMUA KATEGORI" || selectedCat === "SEMUA" || !selectedCat;
-
-  // dateDisplayMap: Map<dateYMD, string[]> (Daftar emiten yang lolos filter)
-  const dateDisplayMap = new Map();
-
-  for (const [dateYMD, emMap] of dateDailyScreeners.entries()) {
-    const validEmitens = [];
-    for (const [sym, screenerSet] of emMap.entries()) {
-      if (isOnlyIrisan) {
-        // Mode Hanya Irisan: Wajib muncul di minimal 2 screener berbeda pada tanggal tsb
-        if (screenerSet.size >= 2) {
-          validEmitens.push(sym);
-        }
-      } else if (isAllCategories) {
-        validEmitens.push(sym);
-      } else {
-        // Filter kategori spesifik
-        const catSet = dateDailyCategories.get(dateYMD)?.get(sym);
-        if (catSet && catSet.has(selectedCat.toLowerCase())) {
-          validEmitens.push(sym);
-        }
-      }
-    }
-    if (validEmitens.length > 0) {
-      dateDisplayMap.set(dateYMD, validEmitens.sort());
-    }
-  }
-
-  // Hitung Hari Senin Pertama & Batas Akhir Bulan (Gunakan jam 12:00 tengah hari agar bebas geseran timezone)
-  const firstDayOfMonth = new Date(year, month - 1, 1, 12, 0, 0);
-  const lastDayOfMonth = new Date(year, month, 0, 12, 0, 0);
-  const dayOfWeek = firstDayOfMonth.getDay(); // 0 = Minggu, 1 = Senin, ..., 6 = Sabtu
-
-  let startMonday;
-  if (dayOfWeek === 1) {
-    startMonday = new Date(year, month - 1, 1, 12, 0, 0);
-  } else if (dayOfWeek === 0) {
-    // Tanggal 1 adalah Minggu -> hari Senin perdagangan pertama adalah tanggal 2
-    startMonday = new Date(year, month - 1, 2, 12, 0, 0);
-  } else if (dayOfWeek === 6) {
-    // Tanggal 1 adalah Sabtu -> hari Senin perdagangan pertama adalah tanggal 3
-    startMonday = new Date(year, month - 1, 3, 12, 0, 0);
-  } else {
-    // Tanggal 1 adalah Selasa s/d Jumat (dayOfWeek 2..5) -> mundur ke hari Senin pada minggu tsb (misal 30 Nov untuk Des)
-    startMonday = new Date(year, month - 1, 1 - (dayOfWeek - 1), 12, 0, 0);
-  }
-
-  // Kumpulkan daftar tanggal yang aktif ditampilkan di kalender untuk hitung frekuensi kemunculan
-  const displayedDates = new Set();
-  for (let w = 0; w < 6; w++) {
-    const weekMonday = new Date(startMonday.getTime() + (w * 7 * 86400000));
-    weekMonday.setHours(12, 0, 0, 0);
-    if (weekMonday <= lastDayOfMonth) {
-      for (let c = 0; c < 5; c++) {
-        const curDate = new Date(weekMonday.getTime() + (c * 86400000));
-        curDate.setHours(12, 0, 0, 0);
-        displayedDates.add(formatDateYMD(curDate));
-      }
-    }
-  }
-
-  // 3. Hitung Frekuensi Kemunculan per Emiten pada Minggu-Minggu Kalender yang Tampil
-  const emitenFreqMap = new Map();
-  for (const dateYMD of displayedDates) {
-    if (dateDisplayMap.has(dateYMD)) {
-      for (const sym of dateDisplayMap.get(dateYMD)) {
-        emitenFreqMap.set(sym, (emitenFreqMap.get(sym) || 0) + 1);
-      }
-    }
-  }
+  const data = getScreenerProcessedData(wsCal, wsScreener);
+  const {
+    dateDailyScreeners,
+    dateDisplayMap,
+    displayedDates,
+    emitenFreqMap,
+    startMonday,
+    lastDayOfMonth
+  } = data;
 
   // Text Style untuk Emiten Berulang (Stabilo Hijau Tebal) & Normal
   const boldGreenStyle = SpreadsheetApp.newTextStyle()
@@ -1239,6 +1355,382 @@ function renderScreenerCalendarPart() {
         dateCell.setValue("").setBackground("#ffffff").setBorder(false, false, false, false, false, false);
         contentCell.setValue("").setBackground("#ffffff").setBorder(false, false, false, false, false, false);
       }
+    }
+  }
+
+  return data;
+}
+
+/**
+ * Render Tabel Irisan Ketiga (Movers & Screener) di Bagian Bawah Kalender (Baris 23 ke bawah)
+ */
+function renderMoversScreenerIntersectionTable(moversData, screenerData) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let wsCal = getSheetCaseInsensitive(ss, "calendar_view");
+  const wsMovers = getSheetCaseInsensitive(ss, "movers_records");
+  const wsScreener = getSheetCaseInsensitive(ss, "screener_records");
+  if (!wsCal) return;
+
+  // Pastikan data Movers & Screener sudah tersedia
+  if (!moversData && wsMovers) {
+    moversData = getMoversProcessedData(wsCal, wsMovers);
+  }
+  if (!screenerData && wsScreener) {
+    screenerData = getScreenerProcessedData(wsCal, wsScreener);
+  }
+
+  // Pastikan baris spreadsheet mencukupi (minimal 80 baris)
+  const currentMaxRows = wsCal.getMaxRows();
+  if (currentMaxRows < 80) {
+    wsCal.insertRowsAfter(currentMaxRows, 80 - currentMaxRows);
+  }
+
+  // Bersihkan area tabel irisan lama dari baris 23 ke bawah
+  const clearRowCount = wsCal.getMaxRows() - 22;
+  if (clearRowCount > 0) {
+    wsCal.getRange(23, 1, clearRowCount, 11).clear();
+  }
+
+  // Row 23: Spacer pembatas dari kalender 6 minggu
+  wsCal.getRange("A23:K23").setBackground("#f8fafc");
+  wsCal.setRowHeight(23, 16);
+
+  // Row 24: Header Judul Utama Tabel Irisan Bersama
+  wsCal.getRange("A24:K24").merge()
+    .setValue("⚡ TABEL IRISAN KETIGA: MOVERS & SCREENER CALENDAR")
+    .setFontWeight("bold").setFontSize(11).setFontColor("#ffffff")
+    .setBackground("#312e81") // Deep Indigo Modern
+    .setHorizontalAlignment("center").setVerticalAlignment("middle");
+  wsCal.setRowHeight(24, 28);
+
+  // Row 25: Sub-judul Penjelasan
+  wsCal.getRange("A25:K25").merge()
+    .setValue("Daftar saham yang masuk ke kalender Movers (Kiri) SEKALIGUS lolos Screener (Kanan) pada kalender bulan terpilih.")
+    .setFontStyle("italic").setFontSize(9).setFontColor("#3730a3")
+    .setBackground("#e0e7ff")
+    .setHorizontalAlignment("center").setVerticalAlignment("middle");
+  wsCal.setRowHeight(25, 22);
+
+  // Jika data movers atau screener tidak tersedia
+  if (!moversData || !screenerData) {
+    wsCal.getRange("A26:K26").merge()
+      .setValue("ℹ️ Sheet movers_records atau screener_records belum tersedia atau belum memiliki data.")
+      .setFontStyle("italic").setFontSize(9.5).setFontColor("#64748b")
+      .setBackground("#ffffff").setHorizontalAlignment("center").setVerticalAlignment("middle");
+    wsCal.setRowHeight(26, 30);
+    return;
+  }
+
+  const { activeCategories, dateFinalEmitenMap, dateEmitenCatMap, displayedDates } = moversData;
+  const { dateDisplayMap, dateDailyScreeners } = screenerData;
+
+  // Jika tidak ada kategori Movers yang dicentang
+  if (activeCategories.size === 0) {
+    wsCal.getRange("A26:K26").merge()
+      .setValue("💡 Centang minimal 1 kategori Movers (kolom A-E atau A-B pada kalender di atas) untuk melihat tabel irisan bersama.")
+      .setFontStyle("italic").setFontSize(9.5).setFontColor("#64748b")
+      .setBackground("#f8fafc").setHorizontalAlignment("center").setVerticalAlignment("middle");
+    wsCal.setRowHeight(26, 30);
+    return;
+  }
+
+  // =========================================================================
+  // 1. HITUNG IRISAN HARI SAMA (SAME-DAY CONFLUENCE)
+  // =========================================================================
+  // Saham yang di tanggal yang sama lolos filter Movers DAN Screener
+  const sameDayMap = new Map();
+  // Kumpulkan juga seluruh emiten unik per tanggal untuk deteksi irisan beda hari dalam bulan
+  const allMoversInMonth = new Map(); // Map<emiten, { dates: Set, cats: Set }>
+  const allScreenerInMonth = new Map(); // Map<emiten, { dates: Set, screeners: Set }>
+
+  for (const dateYMD of displayedDates) {
+    const moversList = dateFinalEmitenMap.get(dateYMD) || [];
+    const screenerList = dateDisplayMap.get(dateYMD) || [];
+
+    // Catat histori bulanan Movers
+    for (const sym of moversList) {
+      if (!allMoversInMonth.has(sym)) {
+        allMoversInMonth.set(sym, { dates: new Set(), cats: new Set() });
+      }
+      allMoversInMonth.get(sym).dates.add(dateYMD);
+      const mCats = dateEmitenCatMap.get(dateYMD)?.get(sym);
+      if (mCats) mCats.forEach(c => allMoversInMonth.get(sym).cats.add(c));
+    }
+
+    // Catat histori bulanan Screener
+    for (const sym of screenerList) {
+      if (!allScreenerInMonth.has(sym)) {
+        allScreenerInMonth.set(sym, { dates: new Set(), screeners: new Set() });
+      }
+      allScreenerInMonth.get(sym).dates.add(dateYMD);
+      const sNames = dateDailyScreeners.get(dateYMD)?.get(sym);
+      if (sNames) sNames.forEach(s => allScreenerInMonth.get(sym).screeners.add(s));
+    }
+
+    // Cari irisan hari sama
+    if (moversList.length > 0 && screenerList.length > 0) {
+      const screenerSet = new Set(screenerList);
+      for (const sym of moversList) {
+        if (screenerSet.has(sym)) {
+          if (!sameDayMap.has(sym)) {
+            sameDayMap.set(sym, {
+              symbol: sym,
+              dates: [],
+              moversCats: new Set(),
+              screeners: new Set(),
+              maxStars: 0
+            });
+          }
+          const item = sameDayMap.get(sym);
+          item.dates.push(dateYMD);
+
+          const mCats = dateEmitenCatMap.get(dateYMD)?.get(sym);
+          if (mCats) mCats.forEach(c => item.moversCats.add(c));
+
+          const sNames = dateDailyScreeners.get(dateYMD)?.get(sym);
+          if (sNames) {
+            sNames.forEach(s => item.screeners.add(s));
+            item.maxStars = Math.max(item.maxStars, sNames.size);
+          }
+        }
+      }
+    }
+  }
+
+  // Urutkan daftar Same-Day:
+  // 1. Frekuensi terbanyak
+  // 2. Tanggal kemunculan terbaru
+  // 3. Nama emiten
+  const sameDayList = Array.from(sameDayMap.values()).map(item => {
+    item.dates.sort();
+    return item;
+  });
+  sameDayList.sort((a, b) => {
+    if (b.dates.length !== a.dates.length) return b.dates.length - a.dates.length;
+    const lastDateA = a.dates[a.dates.length - 1] || "";
+    const lastDateB = b.dates[b.dates.length - 1] || "";
+    if (lastDateB !== lastDateA) return lastDateB.localeCompare(lastDateA);
+    return a.symbol.localeCompare(b.symbol);
+  });
+
+  // =========================================================================
+  // 2. HITUNG IRISAN PERIODE BULAN (HARI BERBEDA)
+  // =========================================================================
+  // Saham yang muncul di Movers & Screener dalam bulan terpilih, tetapi di tanggal yang berbeda
+  const diffDayList = [];
+  for (const [sym, mInfo] of allMoversInMonth.entries()) {
+    if (allScreenerInMonth.has(sym) && !sameDayMap.has(sym)) {
+      const sInfo = allScreenerInMonth.get(sym);
+      diffDayList.push({
+        symbol: sym,
+        moversDates: Array.from(mInfo.dates).sort(),
+        screenerDates: Array.from(sInfo.dates).sort(),
+        moversCats: mInfo.cats,
+        screeners: sInfo.screeners
+      });
+    }
+  }
+  diffDayList.sort((a, b) => {
+    const totalA = a.moversDates.length + a.screenerDates.length;
+    const totalB = b.moversDates.length + b.screenerDates.length;
+    if (totalB !== totalA) return totalB - totalA;
+    return a.symbol.localeCompare(b.symbol);
+  });
+
+  // =========================================================================
+  // 3. RENDER TABEL BAGIAN 1: IRISAN HARI SAMA (SAME-DAY CONFLUENCE)
+  // =========================================================================
+  // Baris 26: Header Seksi 1
+  wsCal.getRange("A26:K26").merge()
+    .setValue("🔥 1. IRISAN HARI SAMA (SAME-DAY CONFLUENCE) — Saham Lolos Movers & Screener di Hari yang Sama")
+    .setFontWeight("bold").setFontSize(9.5).setFontColor("#1e40af")
+    .setBackground("#dbeafe")
+    .setHorizontalAlignment("center").setVerticalAlignment("middle");
+  wsCal.setRowHeight(26, 24);
+
+  // Baris 27: Header Kolom Seksi 1
+  const colHeaders1 = ["No", "Kode Emiten", "Total Muncul", "Tanggal Muncul", "", "", "Kategori Movers Terpenuhi", "", "Screener & Sinyal Terdeteksi", "", ""];
+  wsCal.getRange("D27:F27").merge();
+  wsCal.getRange("G27:H27").merge();
+  wsCal.getRange("I27:K27").merge();
+  wsCal.getRange("A27:K27").setValues([colHeaders1])
+    .setFontWeight("bold").setFontSize(9.5).setFontColor("#ffffff")
+    .setBackground("#1e3a8a")
+    .setHorizontalAlignment("center").setVerticalAlignment("middle")
+    .setBorder(true, true, true, true, true, true, "#1e3a8a", SpreadsheetApp.BorderStyle.SOLID);
+  wsCal.setRowHeight(27, 26);
+
+  let curRow = 28;
+
+  if (sameDayList.length === 0) {
+    wsCal.getRange(curRow, 1, 1, 11).merge()
+      .setValue("ℹ️ Tidak ada emiten yang beririsan di hari bursa yang sama pada bulan ini.")
+      .setFontStyle("italic").setFontSize(9.5).setFontColor("#64748b")
+      .setBackground("#ffffff").setHorizontalAlignment("center").setVerticalAlignment("middle")
+      .setBorder(true, true, true, true, false, false, "#cbd5e1", SpreadsheetApp.BorderStyle.SOLID);
+    wsCal.setRowHeight(curRow, 30);
+    curRow++;
+  } else {
+    // Pastikan kapasitas baris mencukupi
+    if (curRow + sameDayList.length + 15 > wsCal.getMaxRows()) {
+      wsCal.insertRowsAfter(wsCal.getMaxRows(), sameDayList.length + 20);
+    }
+
+    const nSame = sameDayList.length;
+    // Merge kolom per baris secara efisien (D:F, G:H, I:K)
+    wsCal.getRange(curRow, 4, nSame, 3).mergeAcross();
+    wsCal.getRange(curRow, 7, nSame, 2).mergeAcross();
+    wsCal.getRange(curRow, 9, nSame, 3).mergeAcross();
+
+    const tableVals = [];
+    const bgs = [];
+    const fWeights = [];
+    const fColors = [];
+
+    for (let i = 0; i < nSame; i++) {
+      const item = sameDayList[i];
+      const isMulti = item.dates.length >= 2;
+      const bg = isMulti ? "#f0fdf4" : (i % 2 === 0 ? "#ffffff" : "#f8fafc");
+
+      const catsStr = Array.from(item.moversCats).map(formatCategoryDisplayName).join(", ");
+      const scrsStr = Array.from(item.screeners).join(", ") + (item.maxStars >= 2 ? ` (${item.maxStars}⭐)` : "");
+
+      tableVals.push([
+        i + 1,
+        item.symbol,
+        isMulti ? `${item.dates.length} Hari 🟢` : "1 Hari",
+        item.dates.join(", "),
+        "",
+        "",
+        catsStr,
+        "",
+        scrsStr,
+        "",
+        ""
+      ]);
+
+      bgs.push(new Array(11).fill(bg));
+      fWeights.push([
+        "normal", "bold", isMulti ? "bold" : "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal"
+      ]);
+      fColors.push([
+        "#475569", isMulti ? "#15803d" : "#0f172a", isMulti ? "#15803d" : "#0f172a", "#1e293b", "#1e293b", "#1e293b", "#334155", "#334155", "#334155", "#334155", "#334155"
+      ]);
+    }
+
+    const rangeSame = wsCal.getRange(curRow, 1, nSame, 11);
+    rangeSame.setValues(tableVals)
+      .setBackgrounds(bgs)
+      .setFontWeights(fWeights)
+      .setFontColors(fColors)
+      .setHorizontalAlignment("center")
+      .setVerticalAlignment("middle")
+      .setWrap(true)
+      .setBorder(true, true, true, true, true, true, "#cbd5e1", SpreadsheetApp.BorderStyle.SOLID);
+
+    for (let r = curRow; r < curRow + nSame; r++) {
+      wsCal.setRowHeight(r, 26);
+    }
+    curRow += nSame;
+  }
+
+  // =========================================================================
+  // 4. RENDER TABEL BAGIAN 2: IRISAN PERIODE BULAN (HARI BERBEDA)
+  // =========================================================================
+  // Spacer baris antar seksi
+  wsCal.getRange(curRow, 1, 1, 11).clear().setBackground("#f8fafc");
+  wsCal.setRowHeight(curRow, 14);
+  curRow++;
+
+  // Header Seksi 2
+  wsCal.getRange(curRow, 1, 1, 11).merge()
+    .setValue("📅 2. IRISAN PERIODE BULAN (HARI BERBEDA) — Muncul di Keduanya dalam Bulan Terpilih (Hari Berbeda)")
+    .setFontWeight("bold").setFontSize(9.5).setFontColor("#475569")
+    .setBackground("#f1f5f9")
+    .setHorizontalAlignment("center").setVerticalAlignment("middle");
+  wsCal.setRowHeight(curRow, 24);
+  curRow++;
+
+  // Header Kolom Seksi 2
+  const colHeaders2 = ["No", "Kode Emiten", "Total Muncul", "Rincian Tanggal (Movers vs Screener)", "", "", "Kategori Movers", "", "Screener Terdeteksi", "", ""];
+  wsCal.getRange(curRow, 4, 1, 3).merge();
+  wsCal.getRange(curRow, 7, 1, 2).merge();
+  wsCal.getRange(curRow, 9, 1, 3).merge();
+  wsCal.getRange(curRow, 1, 1, 11).setValues([colHeaders2])
+    .setFontWeight("bold").setFontSize(9.5).setFontColor("#ffffff")
+    .setBackground("#475569")
+    .setHorizontalAlignment("center").setVerticalAlignment("middle")
+    .setBorder(true, true, true, true, true, true, "#475569", SpreadsheetApp.BorderStyle.SOLID);
+  wsCal.setRowHeight(curRow, 26);
+  curRow++;
+
+  if (diffDayList.length === 0) {
+    wsCal.getRange(curRow, 1, 1, 11).merge()
+      .setValue("ℹ️ Tidak ada emiten tambahan yang muncul di hari berbeda pada bulan ini.")
+      .setFontStyle("italic").setFontSize(9.5).setFontColor("#64748b")
+      .setBackground("#ffffff").setHorizontalAlignment("center").setVerticalAlignment("middle")
+      .setBorder(true, true, true, true, false, false, "#cbd5e1", SpreadsheetApp.BorderStyle.SOLID);
+    wsCal.setRowHeight(curRow, 30);
+  } else {
+    // Pastikan kapasitas baris mencukupi
+    if (curRow + diffDayList.length + 5 > wsCal.getMaxRows()) {
+      wsCal.insertRowsAfter(wsCal.getMaxRows(), diffDayList.length + 10);
+    }
+
+    const nDiff = diffDayList.length;
+    wsCal.getRange(curRow, 4, nDiff, 3).mergeAcross();
+    wsCal.getRange(curRow, 7, nDiff, 2).mergeAcross();
+    wsCal.getRange(curRow, 9, nDiff, 3).mergeAcross();
+
+    const diffVals = [];
+    const diffBgs = [];
+    const diffFw = [];
+    const diffFc = [];
+
+    for (let j = 0; j < nDiff; j++) {
+      const item = diffDayList[j];
+      const bg = j % 2 === 0 ? "#ffffff" : "#f8fafc";
+      const mStr = item.moversDates.join(", ");
+      const sStr = item.screenerDates.join(", ");
+      const dateDetail = `M: [${mStr}] | S: [${sStr}]`;
+      const catsStr = Array.from(item.moversCats).map(formatCategoryDisplayName).join(", ");
+      const scrsStr = Array.from(item.screeners).join(", ");
+
+      diffVals.push([
+        j + 1,
+        item.symbol,
+        `M: ${item.moversDates.length}x | S: ${item.screenerDates.length}x`,
+        dateDetail,
+        "",
+        "",
+        catsStr,
+        "",
+        scrsStr,
+        "",
+        ""
+      ]);
+
+      diffBgs.push(new Array(11).fill(bg));
+      diffFw.push([
+        "normal", "bold", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal", "normal"
+      ]);
+      diffFc.push([
+        "#475569", "#0f172a", "#475569", "#334155", "#334155", "#334155", "#475569", "#475569", "#475569", "#475569", "#475569"
+      ]);
+    }
+
+    const rangeDiff = wsCal.getRange(curRow, 1, nDiff, 11);
+    rangeDiff.setValues(diffVals)
+      .setBackgrounds(diffBgs)
+      .setFontWeights(diffFw)
+      .setFontColors(diffFc)
+      .setHorizontalAlignment("center")
+      .setVerticalAlignment("middle")
+      .setWrap(true)
+      .setBorder(true, true, true, true, true, true, "#cbd5e1", SpreadsheetApp.BorderStyle.SOLID);
+
+    for (let r = curRow; r < curRow + nDiff; r++) {
+      wsCal.setRowHeight(r, 26);
     }
   }
 }
@@ -1610,6 +2102,7 @@ function updateCategoryDropdown() {
 function updateAllViews() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   ensureWIBTimeZone(ss);
+  formatExistingNetForeignSellParentheses();
   renderUnifiedCalendarView();
   renderMoversDashboard();
   renderScreenerDashboard();
@@ -1644,6 +2137,7 @@ function setupGuideSheetStructure() {
     ["   b. SISI KIRI (Movers): Centang kategori Movers yang ingin Anda pantau (Top Gainer, Top Loser, Top Value, Top Volume, Top Frequency, Net Foreign Buy, Net Foreign Sell). Hanya saham yang masuk irisan penuh dari seluruh kategori yang dicentang yang akan muncul."],
     ["   c. SISI KANAN (Screener): Pilih kategori screener yang ingin Anda pantau pada dropdown G6."],
     ["   d. Anda dapat melihat secara instan per baris hari: saham apa yang masuk Top Movers sekaligus lolos Screener hari itu!"],
+    ["   e. TABEL IRISAN KETIGA (Bagian Bawah): Menampilkan tabel rekap saham yang masuk ke kalender Movers (Kiri) SEKALIGUS lolos Screener (Kanan), lengkap dengan total hari kemunculan, daftar tanggal, kategori Movers, dan screener terdeteksi."],
     [""],
     ["3. CARA MENGGUNAKAN DASHBOARD:"],
     ["   - 'movers_dashboard' menyajikan frekuensi kemunculan saham dan irisan kategori movers dalam rentang tanggal tertentu."],
@@ -1778,11 +2272,10 @@ function showUpdateScriptModal() {
           <div class="features-box">
             <div style="font-weight: 700; color: #0f172a; margin-bottom: 6px;">✨ Perbaikan & Pembaruan Terkini (v${currentVer}):</div>
             <ul style="margin: 0; padding-left: 18px; line-height: 1.6;">
-              <li><b>Menu Baru: 🛠️ Koreksi Tanggal Records:</b> Alat bantu 1-klik untuk memeriksa dan mengoreksi tanggal transaksi di sheet records yang sempat salah akibat jam bursa atau zona waktu.</li>
-              <li><b>Sinkronisasi Otomatis Jam Buka Bursa (09.00 WIB):</b> Sebelum jam 09.00 WIB bursa hari ini belum buka, sehingga data otomatis dicatat sebagai data penutupan hari bursa sebelumnya (misal: sync Rabu &lt; 09.00 WIB = data Selasa; Senin &lt; 09.00 WIB = data Jumat).</li>
-              <li><b>Sinkronisasi Akhir Pekan (Sabtu & Minggu):</b> Otomatis ditetapkan ke hari <b>Jumat</b> penutupan terakhir.</li>
-              <li><b>Pengembalian Zona Waktu ke Semula:</b> Tidak mengubah setelan timezone Spreadsheet, parsing tanggal kembali mengikuti konfigurasi asli.</li>
-              <li><b>Format Simbol Bintang Ringkas:</b> Irisan screener disajikan ringkas (<b>2⭐</b>, <b>3⭐</b>, dst.) hemat tempat & rapi di kolom kalender.</li>
+              <li><b>Tabel Irisan Ketiga (Movers & Screener):</b> Tabel cerdas baru di bawah Calendar View yang otomatis merekap emiten yang masuk Movers (Kiri) SEKALIGUS lolos Screener (Kanan), lengkap dengan total hari kemunculan, daftar tanggal, kategori Movers, dan screener/bintang ⭐.</li>
+              <li><b>Format Parentheses '()' Net Foreign Sell:</b> Nilai Net Foreign pada kategori Net Foreign Sell otomatis diformat dengan tanda kurung misal <b>(100)</b> untuk menegaskan posisi jual bersih (negatif) baik saat sync data baru maupun data riwayat lama.</li>
+              <li><b>Menu 🛠️ Koreksi Tanggal Records:</b> Alat bantu 1-klik untuk memeriksa dan mengoreksi tanggal transaksi di sheet records secara instan.</li>
+              <li><b>Sinkronisasi Pra-Buka Bursa (09.00 WIB) & Akhir Pekan:</b> Jam bursa sebelum 09.00 WIB otomatis dicatat sebagai data penutupan hari bursa sebelumnya, dan akhir pekan dicatat ke hari penutupan Jumat.</li>
             </ul>
           </div>
 
@@ -2212,6 +2705,7 @@ function executeFixRecordDate(oldDateStr, newDateStr) {
   }
 
   // 3. Refresh seluruh kalender dan dashboard
+  formatExistingNetForeignSellParentheses();
   renderUnifiedCalendarView();
   renderMoversDashboard();
   renderScreenerDashboard();
