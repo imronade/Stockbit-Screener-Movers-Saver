@@ -29,7 +29,7 @@
 // =========================================================================================
 // KONFIGURASI VERSI SCRIPT
 // =========================================================================================
-const SCRIPT_VERSION = "1.3.3";
+const SCRIPT_VERSION = "1.3.4";
 
 /**
  * Menu Kustom di Google Sheets saat file dibuka
@@ -111,7 +111,6 @@ function doPost(e) {
 
     const payload = JSON.parse(e.postData.contents);
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    ensureWIBTimeZone(ss);
 
     // -----------------------------------------------------------------------
     // A. JALUR MOVERS
@@ -158,8 +157,19 @@ function doPost(e) {
     // -----------------------------------------------------------------------
     if (payload.type === "screener" || payload.action === "appendScreener" || payload.screenerName || payload.rows) {
       const screenerName = payload.screenerName || "Stockbit Screener";
-      const dateStr = payload.date || Utilities.formatDate(new Date(), "Asia/Jakarta", "yyyy-MM-dd");
-      const dayStr = getIndonesianDay(new Date());
+
+      // Jika tanggal tidak dikirim dari payload, hitung tanggal bursa terakhir (Sabtu/Minggu mundur ke Jumat)
+      let dateStr = payload.date;
+      if (!dateStr) {
+        const now = new Date();
+        const day = now.getDay();
+        const target = new Date(now.getTime());
+        if (day === 6) target.setDate(target.getDate() - 1);
+        else if (day === 0) target.setDate(target.getDate() - 2);
+        const ssTz = ss.getSpreadsheetTimeZone() || "Asia/Jakarta";
+        dateStr = Utilities.formatDate(target, ssTz, "yyyy-MM-dd");
+      }
+      const dayStr = getIndonesianDay(dateStr);
       const rows = payload.rows || [];
 
       if (rows.length === 0) {
@@ -296,30 +306,21 @@ function safeToast(msg, title = "Info", timeout = 3) {
   } catch (_) {}
 }
 
-/**
- * Memastikan Spreadsheet selalu terkunci pada zona waktu resmi Asia/Jakarta (WIB / UTC+7)
- */
-function ensureWIBTimeZone(ss) {
-  try {
-    if (!ss) ss = SpreadsheetApp.getActiveSpreadsheet();
-    if (ss && ss.getSpreadsheetTimeZone() !== "Asia/Jakarta") {
-      ss.setSpreadsheetTimeZone("Asia/Jakarta");
-    }
-  } catch (_) {}
-}
-
 function parseDateToYMD(val) {
   if (!val) return "";
   if (val instanceof Date) {
     if (isNaN(val.getTime())) return "";
-    // Menambahkan 12 jam (tengah hari) dan format paten menggunakan zona waktu Asia/Jakarta (WIB / UTC+7)
+    // Menambahkan 12 jam (tengah hari) sebelum format agar aman dari pergeseran hari
+    // akibat perbedaan offset zona waktu (misal WITA UTC+8 / WIB UTC+7 / UTC)
     const safeDate = new Date(val.getTime() + (12 * 3600 * 1000));
-    return Utilities.formatDate(safeDate, "Asia/Jakarta", "yyyy-MM-dd");
+    const ssTz = SpreadsheetApp.getActiveSpreadsheet() ? SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone() : "Asia/Jakarta";
+    return Utilities.formatDate(safeDate, ssTz || "Asia/Jakarta", "yyyy-MM-dd");
   }
   if (typeof val === "number") {
     const epoch = new Date(1899, 11, 30, 12, 0, 0);
     const d = new Date(epoch.getTime() + val * 86400000);
-    return Utilities.formatDate(d, "Asia/Jakarta", "yyyy-MM-dd");
+    const ssTz = SpreadsheetApp.getActiveSpreadsheet() ? SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone() : "Asia/Jakarta";
+    return Utilities.formatDate(d, ssTz || "Asia/Jakarta", "yyyy-MM-dd");
   }
   const s = String(val).trim();
   if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
@@ -347,11 +348,21 @@ function formatDateYMD(d) {
   return `${y}-${m}-${day}`;
 }
 
-function getIndonesianDay(date) {
+function getIndonesianDay(dateVal) {
   const days = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
-  const d = date || new Date();
-  const dayNum = parseInt(Utilities.formatDate(d, "Asia/Jakarta", "u"), 10);
-  return days[dayNum % 7];
+  if (!dateVal) {
+    return days[new Date().getDay()];
+  }
+  if (dateVal instanceof Date) {
+    return days[dateVal.getDay()];
+  }
+  const ymd = parseDateToYMD(dateVal);
+  if (ymd) {
+    const parts = ymd.split("-");
+    const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10), 12, 0, 0);
+    return days[d.getDay()];
+  }
+  return days[new Date().getDay()];
 }
 
 function getCategoryMapping(settingSheet) {
@@ -378,9 +389,7 @@ function getMonthNamesList() {
 }
 
 function parseMonthIndex(monthStr) {
-  if (!monthStr) {
-    return parseInt(Utilities.formatDate(new Date(), "Asia/Jakarta", "M"), 10);
-  }
+  if (!monthStr) return new Date().getMonth() + 1;
   const s = String(monthStr).trim().toLowerCase();
 
   // 1. Cek angka dalam kurung, misal "November (11)"
@@ -410,7 +419,7 @@ function parseMonthIndex(monthStr) {
     if (s.startsWith(name)) return idx;
   }
 
-  return parseInt(Utilities.formatDate(new Date(), "Asia/Jakarta", "M"), 10);
+  return new Date().getMonth() + 1;
 }
 
 // =========================================================================================
@@ -418,7 +427,6 @@ function parseMonthIndex(monthStr) {
 // =========================================================================================
 function setupTemplateViews() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  ensureWIBTimeZone(ss);
 
   // 1. Sheet: panduan_penggunaan
   setupGuideSheetStructure();
@@ -540,15 +548,13 @@ function reorderAllSheets() {
 // =========================================================================================
 function setupCalendarSheetStructure() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  ensureWIBTimeZone(ss);
   let wsCal = getSheetCaseInsensitive(ss, "calendar_view");
   if (!wsCal) wsCal = ss.insertSheet("calendar_view", 0);
 
   // Pertahankan filter dan checklist yang sudah dipilih user sebelumnya (jika ada)
-  let curYear = Utilities.formatDate(new Date(), "Asia/Jakarta", "yyyy");
+  let curYear = String(new Date().getFullYear());
   const monthNames = getMonthNamesList();
-  const curMonthIdx = parseInt(Utilities.formatDate(new Date(), "Asia/Jakarta", "M"), 10) - 1;
-  let curMonth = monthNames[curMonthIdx];
+  let curMonth = monthNames[new Date().getMonth()];
   let curCategory = "SEMUA KATEGORI";
   let curChecksRow1 = [true, false, false, false, false];
   let curChecksRow2 = [false, false];
@@ -1568,8 +1574,6 @@ function updateCategoryDropdown() {
 // 6. REFRESH SEMUA VIEW & DATA
 // =========================================================================
 function updateAllViews() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  ensureWIBTimeZone(ss);
   renderUnifiedCalendarView();
   renderMoversDashboard();
   renderScreenerDashboard();
@@ -1738,10 +1742,10 @@ function showUpdateScriptModal() {
           <div class="features-box">
             <div style="font-weight: 700; color: #0f172a; margin-bottom: 6px;">✨ Perbaikan & Pembaruan Terkini (v${currentVer}):</div>
             <ul style="margin: 0; padding-left: 18px; line-height: 1.6;">
-              <li><b>Penguncian Zona Waktu UTC+7 / WIB:</b> Mencegah pergeseran tanggal saat sinkronisasi di dini hari & mengunci setelan lembar kerja ke <code>Asia/Jakarta</code>.</li>
+              <li><b>Sinkronisasi Akhir Pekan Cerdas:</b> Jika sync dilakukan di hari Sabtu atau Minggu saat bursa libur, tanggal otomatis ditetapkan ke hari <b>Jumat</b> (penutupan bursa terakhir).</li>
+              <li><b>Pengembalian Zona Waktu ke Semula:</b> Tidak mengubah/memaksa setelan timezone Spreadsheet, parsing tanggal kembali mengikuti konfigurasi asli pengguna.</li>
               <li><b>Penyelarasan Kalender Bursa (Senin – Jumat):</b> Tanggal awal bulan yang jatuh di tengah minggu (Oktober, Desember, April, dll.) otomatis menarik hari Senin dari bulan sebelumnya dan memasukkan seluruh datanya secara utuh.</li>
               <li><b>Format Simbol Bintang Ringkas:</b> Irisan screener disajikan ringkas (<b>2⭐</b>, <b>3⭐</b>, dst.) hemat tempat & rapi di kolom kalender.</li>
-              <li><b>Mode Khusus Irisan di Kalender:</b> Opsi dropdown <b>⭐ HANYA IRISAN (≥ 2 SCREENER)</b> untuk menyaring saham yang menembus multi-screener harian.</li>
             </ul>
           </div>
 

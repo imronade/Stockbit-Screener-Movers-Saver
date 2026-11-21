@@ -59,7 +59,17 @@ Ekstensi browser terpadu untuk **Google Chrome**, **Microsoft Edge**, **Brave Br
 
 ## 🔄 Catatan Rilis & Fitur Terbaru (Changelog)
 
-### 📌 Versi 1.3.3 (Terbaru)
+### 📌 Versi 1.3.4 (Terbaru)
+* **Penanganan Cerdas Sinkronisasi Akhir Pekan (Sabtu / Minggu ➔ Tanggal Penutupan Jumat):**
+  * **Sinkronisasi Otomatis Mengikuti Hari Bursa:** Pada akhir pekan (Sabtu & Minggu), bursa efek Indonesia (IDX) libur dan data yang tampil di Stockbit merupakan data penutupan perdagangan hari Jumat. Ekstensi browser dan Google Apps Script kini otomatis mendeteksi:
+    * Jika sync/ekspor dilakukan di hari **Sabtu**, tanggal otomatis ditetapkan ke hari **Jumat (H-1)** dan kolom Hari tertulis **Jumat**.
+    * Jika sync/ekspor dilakukan di hari **Minggu**, tanggal otomatis ditetapkan ke hari **Jumat (H-2)** dan kolom Hari tertulis **Jumat**.
+    * Jika sync dilakukan di hari bursa aktif (**Senin – Jumat**), tanggal tetap sesuai hari transaksi.
+* **Pengembalian Penanganan Zona Waktu ke Semula:**
+  * Menghapus pemaksaan pengubahan setelan timezone Spreadsheet (`setSpreadsheetTimeZone`) agar tidak menggeser tampilan tanggal pada data riwayat (*records*) eksisting.
+  * Fungsi parsing tanggal `parseDateToYMD` kembali mengikuti konfigurasi bawaan Spreadsheet pengguna secara proporsional.
+
+### 📌 Versi 1.3.3
 * **Penguncian Zona Waktu Baku UTC+7 / WIB (Asia/Jakarta):**
   * **Standarisasi Ekstensi Browser (`content.js`):** Seluruh penanggalan ekspor file Excel (`.xlsx`) dan pengiriman data ke Google Sheets dikunci menggunakan `Intl.DateTimeFormat` dengan zona waktu paten `Asia/Jakarta` (WIB / UTC+7). Hal ini mengeliminasi masalah pergeseran tanggal ke hari kemarin saat pengambilan data dilakukan di dini hari (antara pukul 00:00 - 06:59 WIB) yang sebelumnya terpengaruh konversi UTC (`toISOString`).
   * **Penguncian Otomatis Spreadsheet (`ensureWIBTimeZone`):** Google Apps Script secara otomatis mengunci konfigurasi zona waktu Spreadsheet ke `Asia/Jakarta` (`ss.setSpreadsheetTimeZone("Asia/Jakarta")`) baik saat menerima sinkronisasi data (`doPost`), setup template awal (`setupTemplateViews`), pembuatan kalender (`setupCalendarSheetStructure`), maupun refresh tampilan (`updateAllViews`).

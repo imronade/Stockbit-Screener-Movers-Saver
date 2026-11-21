@@ -221,19 +221,29 @@
   }
 
   /**
-   * Helper penanggalan yang mengunci zona waktu ke Asia/Jakarta (WIB / UTC+7)
+   * Helper penanggalan data bursa (Market Date):
+   * - Hari Senin s/d Jumat: Menggunakan tanggal hari ini.
+   * - Hari Sabtu: Menggunakan tanggal hari Jumat (H-1) karena bursa libur dan data Stockbit adalah penutupan Jumat.
+   * - Hari Minggu: Menggunakan tanggal hari Jumat (H-2) karena bursa libur dan data Stockbit adalah penutupan Jumat.
    */
-  function getWIBDate() {
-    const formatter = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'Asia/Jakarta',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    });
-    const ymd = formatter.format(new Date()); // Format: 'YYYY-MM-DD'
-    const [y, m, d] = ymd.split('-');
+  function getMarketDate() {
+    const now = new Date();
+    const day = now.getDay(); // 0 = Minggu, 1 = Senin, ..., 6 = Sabtu
+
+    const target = new Date(now.getTime());
+    if (day === 6) {
+      // Sabtu -> mundur 1 hari ke Jumat
+      target.setDate(target.getDate() - 1);
+    } else if (day === 0) {
+      // Minggu -> mundur 2 hari ke Jumat
+      target.setDate(target.getDate() - 2);
+    }
+
+    const y = target.getFullYear();
+    const m = String(target.getMonth() + 1).padStart(2, '0');
+    const d = String(target.getDate()).padStart(2, '0');
     return {
-      ymd,
+      ymd: `${y}-${m}-${d}`,
       dmy: `${d}/${m}/${y}`,
       compact: `${y}${m}${d}`
     };
@@ -252,7 +262,7 @@
     }
 
     const rawTitle = getScreenerTitle();
-    const today = getWIBDate().ymd;
+    const today = getMarketDate().ymd;
     const fileName = `${cleanFileName(rawTitle)}_${today}.xlsx`;
     const sheetName = cleanSheetName(rawTitle);
 
@@ -317,7 +327,7 @@
       type: 'screener',
       action: 'appendScreener',
       screenerName: screenerTitle,
-      date: getWIBDate().ymd,
+      date: getMarketDate().ymd,
       rows: rowsList
     };
 
@@ -449,11 +459,11 @@
   // 5. MODUL: STOCKBIT MOVERS SAVER
   // =========================================================================
   function getTodayString() {
-    return getWIBDate().dmy;
+    return getMarketDate().dmy;
   }
 
   function getTodayCompact() {
-    return getWIBDate().compact;
+    return getMarketDate().compact;
   }
 
   function findMoversHeader() {
